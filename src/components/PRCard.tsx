@@ -192,13 +192,13 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
       <div className="pr-card-badges">
         <span 
           className="pr-badge pr-state" 
-          style={{ backgroundColor: getStateColor(pr.state) }}
+          style={{ borderColor: getStateColor(pr.state) }}
         >
           {pr.state.toUpperCase()}
         </span>
-        {/* TODO: Add checks status badge when available */}
-        <span className="pr-badge pr-checks">
-          CHECKS: PASSED
+        {/* Checks status badge - neutral label with colored value */}
+        <span className="pr-badge pr-checks passed">
+          Checks: <span className="check-value">Passed</span>
         </span>
         {/* Author and date info */}
         <span className="pr-card-author-info">

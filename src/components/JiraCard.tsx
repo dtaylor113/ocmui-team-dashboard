@@ -44,32 +44,83 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
     }
   };
 
+  const toTitleCase = (value: string) => {
+    if (!value) return '';
+    return value
+      .toString()
+      .replace(/[_-]+/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const getTypeIcon = (type: string): string => {
+    switch (type.toUpperCase()) {
+      case 'STORY': return '🟩';
+      case 'TASK': return '🟦';
+      case 'BUG': return '🐞';
+      case 'EPIC': return '🟪';
+      default: return '⬡';
+    }
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority.toUpperCase()) {
-      case 'HIGHEST': return '#dc2626'; // Dark red
-      case 'HIGH': return '#ea580c'; // Orange-red
-      case 'MAJOR': return '#f59e0b'; // Orange
-      case 'MEDIUM': return '#eab308'; // Yellow
-      case 'LOW': return '#65a30d'; // Green
-      case 'LOWEST': return '#16a34a'; // Dark green
-      default: return '#6b7280'; // Gray
+      case 'BLOCKER':
+        return '#ef4444'; // Bright red
+      case 'CRITICAL':
+        return '#dc2626'; // Red
+      case 'MAJOR':
+        return '#ea580c'; // Orange
+      case 'NORMAL':
+        return '#d6a94f'; // Tan-like
+      case 'MINOR':
+        return '#3b82f6'; // Blue
+      case 'UNDEFINED':
+      case 'NONE':
+        return '#9ca3af'; // Gray
+      default:
+        return '#6b7280'; // Gray fallback
     }
+  };
+
+  const renderPriorityIcon = (priority: string) => {
+    const p = priority.toUpperCase();
+    const color = getPriorityColor(priority);
+    if (p === 'UNDEFINED' || p === 'NONE') {
+      return <span className="jira-badge-circle" aria-hidden="true" style={{ borderColor: color }}></span>;
+    }
+    if (p === 'MINOR') {
+      return <span className="jira-badge-triangle-down" aria-hidden="true" style={{ borderTopColor: color }}></span>;
+    }
+    if (p === 'NORMAL') {
+      return <span className="jira-badge-equals" aria-hidden="true" style={{ color }}>≡</span>;
+    }
+    // Upward triangles for Major, Critical, Blocker
+    return <span className="jira-badge-triangle" aria-hidden="true" style={{ borderBottomColor: color }}></span>;
   };
 
   const getStatusColor = (status: string) => {
     const normalizedStatus = status.toUpperCase().replace(/\s+/g, '_');
     switch (normalizedStatus) {
-      case 'IN_PROGRESS':
-      case 'IN PROGRESS': return '#3b82f6'; // Blue
-      case 'DONE':
-      case 'RESOLVED': return '#22c55e'; // Green
       case 'TO_DO':
       case 'TODO':
-      case 'OPEN': return '#6b7280'; // Gray
-      case 'BLOCKED': return '#ef4444'; // Red
+      case 'OPEN':
+        return '#42526E'; // Jira To Do gray-blue
+      case 'IN_PROGRESS':
+      case 'IN PROGRESS':
+        return '#0052CC'; // Jira blue
+      case 'CODE_REVIEW':
       case 'IN_REVIEW':
-      case 'REVIEW': return '#8b5cf6'; // Purple
-      default: return '#6b7280'; // Gray
+      case 'REVIEW':
+        return '#0052CC'; // Jira blue for review stages
+      case 'DONE':
+      case 'RESOLVED':
+      case 'CLOSED':
+        return '#00875A'; // Jira green
+      case 'BLOCKED':
+        return '#EF4444'; // Red for blocked
+      default:
+        return '#6b7280'; // Fallback gray
     }
   };
 
@@ -103,19 +154,21 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
       <div className="jira-card-badges">
         <span 
           className="jira-badge jira-type" 
-          style={{ backgroundColor: getTypeColor(ticket.type) }}
+          style={{ borderColor: getTypeColor(ticket.type) }}
         >
-          {ticket.type.toUpperCase()}
+          <span className="jira-badge-icon" aria-hidden="true">{getTypeIcon(ticket.type)}</span>
+          {toTitleCase(ticket.type)}
         </span>
         <span 
           className="jira-badge jira-priority" 
-          style={{ backgroundColor: getPriorityColor(ticket.priority) }}
+          style={{ borderColor: getPriorityColor(ticket.priority) }}
         >
-          {ticket.priority.toUpperCase()}
+          {renderPriorityIcon(ticket.priority)}
+          {toTitleCase(ticket.priority)}
         </span>
         <span 
           className="jira-badge jira-status" 
-          style={{ backgroundColor: getStatusColor(ticket.status) }}
+          style={{ backgroundColor: getStatusColor(ticket.status), borderColor: getStatusColor(ticket.status) }}
         >
           {ticket.status.toUpperCase()}
         </span>

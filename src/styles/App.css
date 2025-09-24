@@ -863,13 +863,65 @@ html, body {
 }
 
 .jira-badge {
+  background: #000000;
+  border: 1px solid #444;
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
+}
+
+.jira-badge .jira-badge-icon {
+  margin-right: 6px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Triangle icon for Jira priority badges */
+.jira-badge-triangle {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid #ea580c; /* color overridden inline */
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+/* Downward triangle */
+.jira-badge-triangle-down {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 9px solid #3b82f6; /* color overridden inline */
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+/* Circle icon */
+.jira-badge-circle {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #9ca3af; /* color overridden inline */
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+/* Equals icon */
+.jira-badge-equals {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
+  margin-right: 6px;
 }
 
 /* JIRA badge colors are set dynamically via style prop */
@@ -921,7 +973,7 @@ html, body {
 
 .pr-card:hover,
 .pr-card.selected {
-  border-color: #16a34a;
+  border-color: #ffffff;
 }
 
 .pr-card:last-child {
@@ -1056,6 +1108,8 @@ html, body {
 }
 
 .pr-badge {
+  background: #000000;
+  border: 1px solid #444;
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
@@ -1068,7 +1122,27 @@ html, body {
 /* PR badge colors for state set dynamically via style prop */
 
 .pr-badge.pr-checks {
-  background: #22c55e; /* Green for passed checks */
+  background: #000000;
+  border-color: #444; /* Neutral default */
+  color: #e5e7eb; /* Neutral default */
+  text-transform: none; /* Preserve camel-case label/value */
+}
+
+.pr-badge.pr-checks.passed {
+  border-color: #22c55e; /* Green border for passed checks */
+}
+
+.pr-badge.pr-checks.failed {
+  border-color: #ef4444; /* Red border for failed checks */
+}
+
+/* Color only the value word inside the checks badge */
+.pr-badge.pr-checks.passed .check-value {
+  color: #22c55e;
+}
+
+.pr-badge.pr-checks.failed .check-value {
+  color: #ef4444;
 }
 
 .pr-card-author-info {
@@ -1112,58 +1186,68 @@ html, body {
   padding: 4px 8px;
   border-radius: 12px;
   font-weight: 500;
+  background: #000000;
 }
 
 .reviewer-badge.reviewer-you {
-  background: #1e40af;
+  background: #000000;
+  border: 1px solid #1e40af;
   color: white;
 }
 
 .reviewer-badge.reviewer-other {
-  background: #6b7280;
+  background: #000000;
+  border: 1px solid #6b7280;
   color: white;
 }
 
 .reviewer-badge.reviewer-bot {
-  background: #7c3aed;
+  background: #000000;
+  border: 1px solid #7c3aed;
   color: white;
 }
 
 .reviewer-badge.reviewer-removed {
-  background: #dc2626;
+  background: #000000;
+  border: 1px solid #dc2626;
   color: white;
 }
 
 .reviewer-badge.reviewer-none {
-  background: #4b5563;
+  background: #000000;
+  border: 1px solid #4b5563;
   color: #9ca3af;
   font-style: italic;
 }
 
 /* Additional reviewer state badges */
 .reviewer-badge.reviewer-approved {
-  background: #22c55e;
+  background: #000000;
+  border: 1px solid #22c55e;
   color: white;
 }
 
 .reviewer-badge.reviewer-changes-requested {
-  background: #ef4444;
+  background: #000000;
+  border: 1px solid #ef4444;
   color: white;
 }
 
 .reviewer-badge.reviewer-commented {
-  background: #3b82f6;
+  background: #000000;
+  border: 1px solid #3b82f6;
   color: white;
 }
 
 .reviewer-badge.reviewer-pending {
-  background: transparent;
+  background: #000000;
   color: #9ca3af;
   border: 1px solid #6b7280;
 }
 
 .reviewer-badge.reviewer-dismissed {
-  background: #6b7280;
+  background: #000000;
+  border: 1px solid #6b7280;
   color: white;
 }
 
@@ -2455,7 +2539,7 @@ html, body {
 .pr-card-title-text {
   cursor: pointer;
   flex: 1;
-  color: #059669; /* Green for PR cards */
+  color: #ffffff; /* Strong white for GitHub PR cards */
   font-weight: 500;
 }
 
