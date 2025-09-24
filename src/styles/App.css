@@ -3532,37 +3532,46 @@ body.dark-theme .github-image-fallback:hover {
 
 /* Notification count badge for reviewer badges */
 .notification-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  background: transparent;
-  color: #ffffff;
-  border: 1px solid #ffffff;
-  border-radius: 8px;
-  margin-left: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 0 4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
   box-sizing: border-box;
-  transition: all 0.2s ease;
+  background: #ef4444; /* Default red badge */
+  color: #ffffff;
+  border: 2px solid #0a0a0a; /* Ring to separate from background */
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  z-index: 2;
+  pointer-events: none; /* Don't block clicks on the badge parent */
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+  transition: transform 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 }
 
 /* Age-based urgency colors */
 .notification-badge.notification-normal {
-  border-color: #ffffff; /* White - less than 1 day old */
+  background: #ffffff; /* White - less than 1 day old */
+  color: #111827;
+  border-color: #0a0a0a;
 }
 
 .notification-badge.notification-warning {
-  border-color: #fbbf24; /* Yellow - 1+ days old */
-  color: #fbbf24;
+  background: #fbbf24; /* Yellow - 1+ days old */
+  color: #111827;
+  border-color: #0a0a0a;
 }
 
 .notification-badge.notification-urgent {
-  border-color: #ef4444; /* Red - 2+ days old */
-  color: #ef4444;
+  background: #ef4444; /* Red - 2+ days old */
+  color: #ffffff;
+  border-color: #0a0a0a;
 }
 
 /* Enhanced tooltip for notifications */
@@ -3572,13 +3581,13 @@ body.dark-theme .github-image-fallback:hover {
 
 /* Hover effect for notification badges */
 .reviewer-badge:has(.notification-badge):hover .notification-badge {
-  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
 }
 
 .reviewer-badge:has(.notification-badge.notification-warning):hover .notification-badge.notification-warning {
-  background: rgba(251, 191, 36, 0.1);
+  transform: translateY(-1px);
 }
 
 .reviewer-badge:has(.notification-badge.notification-urgent):hover .notification-badge.notification-urgent {
-  background: rgba(239, 68, 68, 0.1);
+  transform: translateY(-1px);
 }
