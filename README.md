@@ -9,7 +9,11 @@
 - **🌐 Unified Dashboard**: Single interface combining both platforms with auto-associations
 - **⏰ Team Timeboard**: Multi-timezone team dashboard with business hours detection
 - **🚀 Developer Productivity**: Reduce context switching between GitHub and JIRA
-
+- **🛎 Activity Badges**: 
+  - PR reviewer badges show a top-right notification circle for new or edited comments since last view
+  - JIRA Comments section shows a superscript notification badge for new or edited comments since last view
+  - Age-based urgency for PR badges (white/yellow/red outline)
+- 
 ## 📱 Interface
 
 ### Navigation Tabs
@@ -24,6 +28,7 @@
 - **Smart Caching**: Background updates with React Query
 - **Timezone Awareness**: All timestamps in your selected timezone
 - **Team Dashboard**: View all team members' local times simultaneously
+ - **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled “(edited)”
 
 ## 🚀 Quick Start
 
@@ -70,7 +75,7 @@ yarn start:dev
 
 ## 📖 Documentation
 
-- See `PROJECT_OVERVIEW.md` for detailed architecture, backend, and API integration.
+- See `APP_TECH_NOTES.md` for detailed architecture, backend, and API integration.
 
 ## 🌍 Team Timeboard
 

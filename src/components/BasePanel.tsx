@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface BasePanelProps {
-  title: string;
+  title: React.ReactNode;
   icon: string;
   iconAlt: string;
   lastUpdated?: string;

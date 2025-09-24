@@ -43,11 +43,16 @@ const JiraComments: React.FC<JiraCommentsProps> = ({ jiraKey }) => {
     <div className="scrollable-content comments-content" style={{ maxHeight: "250px" }}>
       {sortedComments.length > 0 ? (
         <div className="comments-list">
-          {sortedComments.map((comment, index) => (
+          {sortedComments.map((comment, index) => {
+            const createdTime = comment.created ? new Date(comment.created).getTime() : 0;
+            const updatedTime = comment.updated ? new Date(comment.updated).getTime() : createdTime;
+            const isEdited = updatedTime > createdTime;
+            const displayDate = updatedTime || createdTime;
+            return (
             <div key={index} className="jira-comment">
               <div className="comment-header">
                 <span className="comment-author">{comment.author}</span>
-                <span className="comment-date">{formatDate(comment.created)}</span>
+                <span className="comment-date">{formatDate(displayDate)}{isEdited ? <span className="comment-edited"> (edited)</span> : null}</span>
               </div>
               <div 
                 className="markdown-container comment-body"
@@ -56,7 +61,7 @@ const JiraComments: React.FC<JiraCommentsProps> = ({ jiraKey }) => {
                 }}
               />
             </div>
-          ))}
+          );})}
         </div>
       ) : (
         <div className="no-content">No comments available</div>

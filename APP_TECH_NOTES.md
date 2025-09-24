@@ -46,7 +46,7 @@ server/index.js (ESM)
 - /api/jira-sprint-tickets  # Sprint JIRAs for user
 ```
 
-The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. It also acts as a JIRA proxy to bypass CORS restrictions in browser environments.
+The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. It also acts as a JIRA proxy to bypass CORS restrictions in browser environments. The `/api/jira-ticket` endpoint includes each comment’s `updated` timestamp (when present) so the UI can detect edited comments.
 
 #### Why a Backend Server Is Required for JIRA (But Not GitHub)
 
@@ -74,8 +74,8 @@ The server is implemented with **ES modules** (import/export) and serves the bui
 - **Associated Panels (Right Side)**: Linked PRs for a JIRA; linked JIRAs for a PR
 
 ### Advanced Components
-- **JiraCard**: Atlassian Document Format rendering; inline images; collapsible sections
-- **PRCard**: GitHub Flavored Markdown; full conversation + review comments; badges
+- **JiraCard**: Atlassian Document Format rendering; inline images; collapsible sections; status (filled Atlassian colors), type & priority (black with colored borders and icons); Comments title with superscript new/edited badge; comments sorted by recent activity and labeled “(edited)” when applicable
+- **PRCard**: GitHub Flavored Markdown; full conversation + review comments; GitHub-themed badges; reviewer notification circles for new/edited comments since last view; PR Checks with camel-cased values and colored word/border
 - **TimeboardModal**: Team timezone dashboard with member management and off-hours indicators
 
 ---
@@ -132,12 +132,17 @@ yarn start:dev
 - **JIRA API**: Proxied via Express; token-based authentication
 - **Hooks**: Centralized in `hooks/useApiQueries.ts`
 - **Background Refetch**: Automatic updates at tuned intervals
-- **Reviewer Discovery**: Aggregates data across multiple GitHub endpoints
+- **Reviewer Discovery**: Aggregates data across multiple GitHub endpoints. Reviewer notification counts use last-click timestamps (localStorage) and consider both created and updated times.
 
 ### Styling & UI
 - Single `App.css` with organized sections
 - Dark theme optimized for developers
-- Responsive layout with clean spacing and hierarchy
+- Panel/card paddings tightened; smaller title spacing for denser lists
+- Reviewer and PR badges use black backgrounds with colored borders by state
+- PR cards use strong white accents (titles/borders)
+- PR Checks: “Checks: Passed/Failed” with colored value, neutral label
+- JIRA badges: status filled (To Do, In Progress/Review, Closed), type/priority black bordered; priority icons (up/down triangle, equals, circle)
+- JIRA comments: superscript badge next to title; comments sorted by latest activity; “(edited)” indicator
 
 ### Image Handling
 - **JIRA Images**: Render inline via `issues.redhat.com` attachments (proxied via backend for CORS)
@@ -166,6 +171,7 @@ yarn start:dev
 ```bash
 yarn start       # Build + serve from Express (recommended default)
 yarn start:dev   # Express API + Vite dev server (hot reload)
+Note: The Express server does not auto-restart on changes. Restart manually or use a watcher like nodemon (e.g., add a `start:api:watch` script).
 yarn build       # Production build
 yarn dev         # Vite dev server only
 yarn start:api   # API server only (no frontend)
