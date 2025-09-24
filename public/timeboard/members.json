@@ -1,0 +1,122 @@
+[
+  {
+    "name": "Dylan Cooper",
+    "role": "dev",
+    "location": "US-Mountain (MDT/MST)",
+    "tz": "America/Denver"
+  },
+  {
+    "name": "Zac Herman",
+    "role": "dev",
+    "location": "US-Mountain (MDT/MST)",
+    "tz": "America/Denver"
+  },
+  {
+    "name": "Kim Doberstein",
+    "role": "team lead",
+    "location": "US-Central (CDT/CST)",
+    "tz": "America/Chicago"
+  },
+  {
+    "name": "Dave Taylor",
+    "role": "team lead",
+    "location": "US-Eastern (EDT/EST)",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Trevor Hendricks",
+    "role": "dev",
+    "location": "US-Eastern (EDT/EST)",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "David Aznaurov",
+    "role": "team lead",
+    "location": "US-Eastern (EDT/EST)",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Lakshmi Shivanthi",
+    "role": "qe dev",
+    "location": "US-Eastern (EDT/EST)",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Jason Loss",
+    "role": "qe dev",
+    "location": "US-Eastern (EDT/EST)",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Joseph Caiani",
+    "role": "manager",
+    "location": "US-Eastern (EDT/EST)",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Deepika Ramakrishnan",
+    "role": "sr. manager",
+    "location": "US-Eastern (EDT/EST)",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Aneela Kaplan",
+    "role": "manager",
+    "location": "Netherlands (CET/CEST)",
+    "tz": "Europe/Amsterdam"
+  },
+  {
+    "name": "Roberto Emanuel",
+    "role": "architect",
+    "location": "Italy (CET/CEST)",
+    "tz": "Europe/Rome"
+  },
+  {
+    "name": "Ales Pecha",
+    "role": "qe dev",
+    "location": "Europe (CET/CEST)",
+    "tz": "Europe/Prague"
+  },
+  {
+    "name": "Denis Ragan",
+    "role": "qe dev",
+    "location": "Europe (CET/CEST)",
+    "tz": "Europe/Berlin"
+  },
+  {
+    "name": "Eliran (Lyn) Malka",
+    "role": "dev",
+    "location": "Israel (IDT/IST)",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Lior Keren",
+    "role": "dev",
+    "location": "Israel (IDT/IST)",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Netta Meiri",
+    "role": "intern",
+    "location": "Israel (IDT/IST)",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Liza Gilman",
+    "role": "dev",
+    "location": "Israel (IDT/IST)",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Nir Farkas",
+    "role": "UX",
+    "location": "Israel (IDT/IST)",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Jaya Mekkattillan",
+    "role": "qe lead",
+    "location": "APAC (SGT/CST - no DST)",
+    "tz": "Asia/Singapore"
+  }
+]

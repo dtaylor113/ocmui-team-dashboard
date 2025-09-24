@@ -1,0 +1,216 @@
+# 🎯 OCMUI Team Dashboard
+
+> Modern React application that unifies GitHub PR management with JIRA ticket tracking to streamline developer workflows for the Red Hat OCMUI team.
+
+## 📋 Project Summary
+
+- **GitHub Integration**: Track PRs, code reviews, and repository activity
+- **JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
+- **Unified Dashboard**: Single interface combining both platforms with auto-associations
+- **Developer Productivity**: Reduce context switching between GitHub and JIRA
+
+---
+
+## 🏗️ Application Architecture
+
+### Repository Structure (Standalone)
+
+```
+ocmui-team-dashboard/
+├── src/                      # React application source (Vite + TypeScript)
+│   ├── components/           # UI components
+│   ├── contexts/             # React Context (settings, auth)
+│   ├── hooks/                # Custom hooks (API integration)
+│   ├── styles/               # Styles (dark theme)
+│   ├── types/                # TypeScript definitions
+│   └── utils/                # Utilities (formatting, notifications)
+├── public/                   # Static assets served by Vite
+├── server/                   # Express API server (ES Modules)
+│   └── index.js              # JIRA proxy endpoints, serves dist/
+├── dist/                     # Production build output (generated)
+├── images/                   # App images used by documentation/UI
+├── package.json              # Dependencies and scripts (Yarn)
+├── vite.config.ts            # Vite configuration
+├── tsconfig*.json            # TypeScript configurations
+├── README.md                 # Quick start & usage
+├── PROJECT_OVERVIEW.md       # Detailed architecture & docs
+└── setup.sh                  # Environment setup script (Yarn)
+```
+
+### Backend API Server (ES Modules)
+
+```
+server/index.js (ESM)
+- /api/test-jira            # JIRA token validation
+- /api/jira-ticket          # Single JIRA ticket lookup
+- /api/jira-sprint-tickets  # Sprint JIRAs for user
+```
+
+The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. It also acts as a JIRA proxy to bypass CORS restrictions in browser environments.
+
+#### Why a Backend Server Is Required for JIRA (But Not GitHub)
+
+- **JIRA** (enterprise instance): No CORS support for browser-origin requests; requires server-side proxy
+- **GitHub**: CORS-friendly public API; tokens work directly from the frontend
+
+---
+
+## 🎨 User Interface & Features
+
+### Navigation System
+- Single-row header with logo, navigation tabs, timeboard, and settings
+- Four primary tabs:
+  1) My Sprint JIRAs
+  2) My Code Reviews
+  3) My PRs
+  4) JIRA Lookup
+- Team Timeboard: Globe button opens team timezone dashboard
+
+### Core Panels
+- **My Sprint JIRAs**: All tickets for current sprint; sorted by last update
+- **JIRA Lookup**: Prefix + number input, recent history, instant associated PRs
+- **My Code Reviews**: PRs requesting your review; reviewer comments modal
+- **My PRs**: Open/closed toggle, associated JIRA detection, status badges
+- **Associated Panels (Right Side)**: Linked PRs for a JIRA; linked JIRAs for a PR
+
+### Advanced Components
+- **JiraCard**: Atlassian Document Format rendering; inline images; collapsible sections
+- **PRCard**: GitHub Flavored Markdown; full conversation + review comments; badges
+- **TimeboardModal**: Team timezone dashboard with member management and off-hours indicators
+
+---
+
+## 🛠️ Development Setup
+
+### Prerequisites
+- Node.js 18+
+- Yarn package manager
+- GitHub personal access token
+- Red Hat JIRA personal access token
+
+### Getting Started
+
+1) Install dependencies
+```bash
+yarn install
+```
+
+2) Start application
+
+- Production-like build and serve (Recommended)
+```bash
+yarn start
+```
+  - Builds React and serves from Express on `http://localhost:3017`
+  - Same-origin for optimal image handling and security
+
+- Development mode (hot reloading)
+```bash
+yarn start:dev
+```
+  - API server: `http://localhost:3017` (Express)
+  - React app: `http://localhost:5174` (Vite dev server)
+
+3) Configure tokens
+- Open Settings (gear icon)
+- Add GitHub token
+- Add JIRA token and email
+- Settings persist in localStorage
+
+---
+
+## 🔧 Technical Architecture
+
+### State Management
+- **React Context**: Settings, tokens, user preferences (timezone)
+- **React Query**: Server state with caching and background updates
+- **LocalStorage**: Token persistence, search history, timezone preferences, team selection
+- **Component State**: UI state and forms
+
+### API Integration
+- **GitHub API**: Direct from frontend; multi-endpoint integration; robust error handling
+- **JIRA API**: Proxied via Express; token-based authentication
+- **Hooks**: Centralized in `hooks/useApiQueries.ts`
+- **Background Refetch**: Automatic updates at tuned intervals
+- **Reviewer Discovery**: Aggregates data across multiple GitHub endpoints
+
+### Styling & UI
+- Single `App.css` with organized sections
+- Dark theme optimized for developers
+- Responsive layout with clean spacing and hierarchy
+
+### Image Handling
+- **JIRA Images**: Render inline via `issues.redhat.com` attachments (proxied via backend for CORS)
+- **GitHub Images**: Inline when accessible; graceful fallback to styled links when blocked/expired
+- **No persistent caching by default**: The server exposes optional cache endpoints, but the frontend does not use them. Images are primarily proxied.
+- **Single-server Mode**: Same-origin serving improves reliability and performance
+
+---
+
+## 🚨 Known Considerations
+- **GitHub Rate Limits**: Standard API rate limits apply; mitigated via React Query
+- **JIRA Authentication**: Requires valid Red Hat JIRA personal access token
+- **GitHub Image Variability**: Some images convert to fallback links depending on repository access or URL lifecycle
+
+---
+
+## 🎯 Development Best Practices
+- Use React Query for all network data
+- Keep types in `src/types/` and shared utilities in `src/utils/`
+- Use `BasePanel` and existing component architecture patterns
+- Provide clear loading and error states consistently
+
+---
+
+## 🧪 Scripts (Yarn)
+```bash
+yarn start       # Build + serve from Express (recommended default)
+yarn start:dev   # Express API + Vite dev server (hot reload)
+yarn build       # Production build
+yarn dev         # Vite dev server only
+yarn start:api   # API server only (no frontend)
+yarn lint        # ESLint
+yarn preview     # Preview production build
+```
+
+---
+
+## 🌐 Endpoints & Quick Links
+- Dashboard: `http://localhost:3017`
+- Settings: `http://localhost:3017/#settings`
+- Timeboard: `http://localhost:3017/#timeboard`
+- JIRA API:
+  - Test: `http://localhost:3017/api/test-jira`
+  - Single ticket: `http://localhost:3017/api/jira-ticket`
+  - Sprint tickets: `http://localhost:3017/api/jira-sprint-tickets`
+
+---
+
+## 🧰 Setup Script (setup.sh)
+
+The `setup.sh` script prepares your environment for running the dashboard.
+
+- What it does:
+  - Verifies Node.js is installed and prints version
+  - Verifies Yarn is installed and prints version
+  - Installs project dependencies via `yarn install`
+  - Warns if port 3017 is already in use (does not kill it automatically)
+  - Prints clear next steps to start the app
+
+- How to run:
+```bash
+
+./setup.sh
+```
+
+- After running:
+  - Start production-like server: `yarn start`
+  - Or start development mode (hot reload): `yarn start:dev`
+  - Open `http://localhost:3017` and configure tokens in Settings (gear icon)
+
+- Troubleshooting:
+  - If port 3017 is busy:
+    ```bash
+    lsof -ti:3017 | xargs kill -9
+    ```
+  - Re-run `./setup.sh` safely any time; it is idempotent.
