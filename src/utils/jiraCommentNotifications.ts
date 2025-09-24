@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'jira-comments-last-viewed';
+const CLEANUP_DAYS = 30;
 
 interface LastViewedMap {
   [jiraKey: string]: number;
@@ -46,6 +47,19 @@ export const countNewJiraCommentsSinceLastViewed = (
     if (recent > lastViewed) count += 1;
   }
   return count;
+};
+
+export const cleanupOldJiraCommentKeys = (): void => {
+  const store = getStore();
+  const cutoff = Date.now() - CLEANUP_DAYS * 24 * 60 * 60 * 1000;
+  let changed = false;
+  Object.keys(store).forEach((key) => {
+    if (store[key] < cutoff) {
+      delete store[key];
+      changed = true;
+    }
+  });
+  if (changed) saveStore(store);
 };
 
 

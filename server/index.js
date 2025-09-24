@@ -63,9 +63,11 @@ app.post('/api/jira-ticket', async (req, res) => {
                         if (ticketData.fields.comment && ticketData.fields.comment.comments) {
                             ticketData.fields.comment.comments.forEach(comment => {
                                 comments.push({
+                                    id: comment.id,
                                     author: comment.author ? comment.author.displayName : 'Unknown',
                                     body: comment.body || '',
-                                    created: comment.created
+                                    created: comment.created,
+                                    updated: comment.updated || comment.updatedDate || comment.created
                                 });
                             });
                         }

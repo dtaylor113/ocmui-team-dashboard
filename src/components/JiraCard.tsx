@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import CollapsibleSection from './CollapsibleSection';
 import JiraDescription from './JiraDescription';
 import JiraComments from './JiraComments';
@@ -35,6 +35,13 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
   // Get full ticket data to access comments count (only if ticket exists and has key)
   const { data: ticketData } = useJiraTicket(ticket?.key || '');
   const { userPreferences } = useSettings();
+  useEffect(() => {
+    // Lazy cleanup of old localStorage keys
+    try {
+      const { cleanupOldJiraCommentKeys } = require('../utils/jiraCommentNotifications');
+      cleanupOldJiraCommentKeys();
+    } catch {}
+  }, []);
   const commentsCount = ticketData?.success && ticketData?.ticket?.comments ? ticketData.ticket.comments.length : 0;
   const newCommentsCount = ticketData?.success && ticketData?.ticket?.comments 
     ? countNewJiraCommentsSinceLastViewed(ticket.key, ticketData.ticket.comments)
@@ -217,9 +224,9 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
       <CollapsibleSection 
         title={
           <>
-            {`Comments (${commentsCount})`}
+            Comments
             {newCommentsCount > 0 && (
-              <span className={`notification-badge superscript-badge notification-${newCommentsCount >= 2 ? 'normal' : 'normal'}`}>{newCommentsCount}</span>
+              <span className="notification-badge superscript-badge">{newCommentsCount}</span>
             )}
           </>
         }

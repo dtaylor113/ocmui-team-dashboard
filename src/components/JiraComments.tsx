@@ -35,10 +35,9 @@ const JiraComments: React.FC<JiraCommentsProps> = ({ jiraKey }) => {
     });
   };
 
-  // Sort comments by most recent first
-  const sortedComments = [...(ticket.comments || [])].sort((a, b) => 
-    new Date(b.created).getTime() - new Date(a.created).getTime()
-  );
+  // Sort comments by most recent activity (updated if present, else created)
+  const getRecentTime = (c: any) => new Date(c.updated || c.created).getTime();
+  const sortedComments = [...(ticket.comments || [])].sort((a, b) => getRecentTime(b) - getRecentTime(a));
 
   return (
     <div className="scrollable-content comments-content" style={{ maxHeight: "250px" }}>

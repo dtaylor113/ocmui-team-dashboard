@@ -1477,8 +1477,8 @@ html, body {
 
 /* Superscript-style notification badge for section headers */
 .collapsible-section-title .notification-badge.superscript-badge {
-  position: static; /* inline with title */
-  top: auto;
+  position: relative; /* allow slight vertical offset */
+  top: -4px; /* raise to look like superscript */
   right: auto;
   display: inline-flex;
   align-items: center;
@@ -1486,13 +1486,13 @@ html, body {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  margin-left: 4px; /* closer to title */
-  background: transparent;
-  color: #ffffff;
-  border: 1px solid #ffffff;
-  border-radius: 8px;
+  margin-left: 4px; /* tight to title */
+  background: #ffffff; /* White fill like PR normal */
+  color: #111827; /* Dark text */
+  border: 1px solid #0a0a0a; /* subtle ring */
+  border-radius: 9999px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   box-shadow: none;
 }
