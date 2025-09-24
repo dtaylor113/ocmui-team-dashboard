@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 interface CollapsibleSectionProps {
-  title: string;
+  title: string | React.ReactNode;
   isExpandedByDefault?: boolean;
   onToggle?: (isExpanded: boolean) => void;
   children: React.ReactNode;

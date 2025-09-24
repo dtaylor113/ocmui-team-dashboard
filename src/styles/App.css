@@ -1475,6 +1475,46 @@ html, body {
   text-align: left;
 }
 
+/* Superscript-style notification badge for section headers */
+.collapsible-section-title .notification-badge.superscript-badge {
+  position: static; /* inline with title */
+  top: auto;
+  right: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 4px; /* closer to title */
+  background: transparent;
+  color: #ffffff;
+  border: 1px solid #ffffff;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.collapsible-section-title .notification-badge.superscript-badge.notification-normal {
+  background: transparent;
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.collapsible-section-title .notification-badge.superscript-badge.notification-warning {
+  background: transparent;
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+.collapsible-section-title .notification-badge.superscript-badge.notification-urgent {
+  background: transparent;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
 .collapsible-section-arrow {
   color: #9ca3af;
   font-size: 12px;

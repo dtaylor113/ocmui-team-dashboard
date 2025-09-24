@@ -5,6 +5,10 @@ import JiraComments from './JiraComments';
 import { useJiraTicket } from '../hooks/useApiQueries';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatJiraTimestamp } from '../utils/formatting';
+import { 
+  countNewJiraCommentsSinceLastViewed, 
+  updateJiraCommentsLastViewed 
+} from '../utils/jiraCommentNotifications';
 
 interface JiraTicket {
   key: string;
@@ -32,6 +36,9 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
   const { data: ticketData } = useJiraTicket(ticket?.key || '');
   const { userPreferences } = useSettings();
   const commentsCount = ticketData?.success && ticketData?.ticket?.comments ? ticketData.ticket.comments.length : 0;
+  const newCommentsCount = ticketData?.success && ticketData?.ticket?.comments 
+    ? countNewJiraCommentsSinceLastViewed(ticket.key, ticketData.ticket.comments)
+    : 0;
   
 
   const getTypeColor = (type: string) => {
@@ -208,8 +215,20 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
 
       {/* Comments Section */}
       <CollapsibleSection 
-        title={`Comments (${commentsCount})`}
+        title={
+          <>
+            {`Comments (${commentsCount})`}
+            {newCommentsCount > 0 && (
+              <span className={`notification-badge superscript-badge notification-${newCommentsCount >= 2 ? 'normal' : 'normal'}`}>{newCommentsCount}</span>
+            )}
+          </>
+        }
         isExpandedByDefault={false}
+        onToggle={(expanded) => {
+          if (expanded) {
+            updateJiraCommentsLastViewed(ticket.key);
+          }
+        }}
         className="jira-comments-section"
       >
         <JiraComments jiraKey={ticket.key} />
