@@ -47,6 +47,22 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
     ? countNewJiraCommentsSinceLastViewed(ticket.key, ticketData.ticket.comments)
     : 0;
   
+  // Parent/Epic links (from full ticket data)
+  const epicKey: string | undefined = ticketData?.ticket?.epicKey;
+  const parentKey: string | undefined = ticketData?.ticket?.parentKey;
+  const featureKey: string | undefined = ticketData?.ticket?.featureKey;
+  const hasEpic = !!epicKey;
+  const hasParent = !!parentKey;
+  const hasFeature = !!featureKey;
+
+  // Fetch summaries for tooltips (queries are disabled when key is falsy)
+  const { data: epicData } = useJiraTicket(hasEpic ? epicKey! : '');
+  const { data: parentData } = useJiraTicket(hasParent ? parentKey! : '');
+  const { data: featureData } = useJiraTicket(hasFeature ? featureKey! : '');
+  const epicTooltip = hasEpic ? `${epicKey}${epicData?.ticket?.summary ? `: ${epicData.ticket.summary}` : ''}` : undefined;
+  const parentTooltip = hasParent ? `${parentKey}${parentData?.ticket?.summary ? `: ${parentData.ticket.summary}` : ''}` : undefined;
+  const featureTooltip = hasFeature ? `${featureKey}${featureData?.ticket?.summary ? `: ${featureData.ticket.summary}` : ''}` : undefined;
+  
 
   const getTypeColor = (type: string) => {
     switch (type.toUpperCase()) {
@@ -209,6 +225,54 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
             <span className="jira-field-value">{formatJiraTimestamp(ticket.created, userPreferences.timezone)}</span>
           </div>
         </div>
+        {hasEpic && (
+          <div className="jira-link-row" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <span className="jira-field-label">Epic Link:</span>
+            <a
+              href={`https://issues.redhat.com/browse/${epicKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={epicTooltip}
+              className="jira-link-value"
+              style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {epicKey}{epicData?.ticket?.summary ? `: ${epicData.ticket.summary}` : ''} ↗
+            </a>
+          </div>
+        )}
+        {hasParent && (
+          <div className="jira-link-row" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <span className="jira-field-label">Parent Link:</span>
+            <a
+              href={`https://issues.redhat.com/browse/${parentKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={parentTooltip}
+              className="jira-link-value"
+              style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {parentKey}{parentData?.ticket?.summary ? `: ${parentData.ticket.summary}` : ''} ↗
+            </a>
+          </div>
+        )}
+        {hasFeature && (
+          <div className="jira-link-row" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <span className="jira-field-label">Feature Link:</span>
+            <a
+              href={`https://issues.redhat.com/browse/${featureKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={featureTooltip}
+              className="jira-link-value"
+              style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {featureKey}{featureData?.ticket?.summary ? `: ${featureData.ticket.summary}` : ''} ↗
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Description Section */}

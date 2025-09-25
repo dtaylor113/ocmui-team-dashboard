@@ -961,6 +961,26 @@ html, body {
   white-space: nowrap;
 }
 
+/* Full-width link rows under JiraCard metadata (match font-size of .jira-card-field) */
+.jira-link-row {
+  display: flex;
+  font-size: 13px;
+}
+
+.jira-link-value {
+  color: #8b5cf6; /* default purple */
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.jira-link-value:visited {
+  color: #8b5cf6; /* keep purple when visited */
+}
+
+.jira-link-value:hover {
+  color: #0052CC; /* Jira blue on hover */
+}
+
 /* ===== PR CARD STYLES ===== */
 .pr-card {
   background: rgba(26, 26, 26, 0.8);

@@ -36,7 +36,8 @@ app.post('/api/jira-ticket', async (req, res) => {
     try {
         const options = {
             hostname: 'issues.redhat.com',
-            path: `/rest/api/2/issue/${jiraId}?expand=changelog,comment,attachment`,
+            // Include names expansion so we can dynamically discover custom field IDs for Epic/Feature Link
+            path: `/rest/api/2/issue/${jiraId}?expand=changelog,comment,attachment,names`,
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -89,6 +90,106 @@ app.post('/api/jira-ticket', async (req, res) => {
                                 }
                             });
                         }
+
+                        // Derive parent, epic, and feature links (best-effort heuristics)
+                        const fields = ticketData.fields || {};
+                        const names = ticketData.names || {};
+
+                        // Parent link (subtasks) and dynamic "Parent Link" custom field (for Epics/others)
+                        let parentKey = null;
+                        try {
+                            // Standard parent for subtasks
+                            if (fields.parent && (fields.parent.key || fields.parent.id)) {
+                                parentKey = fields.parent.key || null;
+                            }
+                            // Dynamic custom field labeled "Parent Link"
+                            if (!parentKey && names) {
+                                const parentFieldIds = Object.keys(names).filter((fid) => String(names[fid] || '').toLowerCase().includes('parent link'));
+                                for (const fid of parentFieldIds) {
+                                    const val = fields[fid];
+                                    if (typeof val === 'string' && /[A-Z]+-\d+/.test(val)) {
+                                        parentKey = val;
+                                        break;
+                                    } else if (val && typeof val === 'object' && val.key) {
+                                        parentKey = val.key;
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch {}
+
+                        // Epic link: attempt dynamic discovery via names mapping, then common candidates
+                        let epicKey = null;
+                        try {
+                            const epicFieldCandidates = [
+                                'customfield_10008', // common Epic Link on many Jira Cloud instances
+                                'customfield_10014',
+                                'customfield_12310243', // common Epic Link on Jira Server/DC
+                                'customfield_10100',
+                                'epic' // occasionally provided as object
+                            ];
+                            // Add any field IDs whose name equals/contains "Epic Link"
+                            Object.keys(names).forEach((fieldId) => {
+                                const label = String(names[fieldId] || '').toLowerCase();
+                                if (label.includes('epic link') && !epicFieldCandidates.includes(fieldId)) {
+                                    epicFieldCandidates.unshift(fieldId);
+                                }
+                            });
+                            for (const candidate of epicFieldCandidates) {
+                                if (fields[candidate]) {
+                                    const value = fields[candidate];
+                                    if (typeof value === 'string' && /[A-Z]+-\d+/.test(value)) {
+                                        epicKey = value;
+                                        break;
+                                    } else if (value && typeof value === 'object' && value.key) {
+                                        epicKey = value.key;
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch {}
+
+                        // Feature link: attempt dynamic discovery via names mapping, then common candidates, then issue links
+                        let featureKey = null;
+                        try {
+                            const featureFieldCandidates = [
+                                'customfield_12310244', // possible Feature Link custom field
+                                'customfield_10009',
+                                'customfield_10010',
+                                'feature' // occasionally provided as object
+                            ];
+                            Object.keys(names).forEach((fieldId) => {
+                                const label = String(names[fieldId] || '').toLowerCase();
+                                if (label.includes('feature link') && !featureFieldCandidates.includes(fieldId)) {
+                                    featureFieldCandidates.unshift(fieldId);
+                                }
+                            });
+                            for (const candidate of featureFieldCandidates) {
+                                if (fields[candidate]) {
+                                    const value = fields[candidate];
+                                    if (typeof value === 'string' && /[A-Z]+-\d+/.test(value)) {
+                                        featureKey = value;
+                                        break;
+                                    } else if (value && typeof value === 'object' && value.key) {
+                                        featureKey = value.key;
+                                        break;
+                                    }
+                                }
+                            }
+                            // If not in custom fields, scan issue links for outward/inward links to a Feature type
+                            if (!featureKey && Array.isArray(ticketData.fields.issuelinks)) {
+                                for (const link of ticketData.fields.issuelinks) {
+                                    const linkedIssue = link.outwardIssue || link.inwardIssue;
+                                    if (linkedIssue && linkedIssue.key && linkedIssue.fields && linkedIssue.fields.issuetype) {
+                                        const typeName = (linkedIssue.fields.issuetype.name || '').toLowerCase();
+                                        if (typeName.includes('feature')) {
+                                            featureKey = linkedIssue.key;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch {}
                         
                         res.json({
                             success: true,
@@ -104,7 +205,10 @@ app.post('/api/jira-ticket', async (req, res) => {
                                 created: ticketData.fields.created,
                                 updated: ticketData.fields.updated,
                                 comments: comments,
-                                attachments: attachments // Include attachment URL mapping
+                                attachments: attachments, // Include attachment URL mapping
+                                parentKey: parentKey,
+                                epicKey: epicKey,
+                                featureKey: featureKey
                             }
                         });
                     } catch (parseError) {
