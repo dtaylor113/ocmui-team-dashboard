@@ -5,6 +5,7 @@ import { useSettings } from '../contexts/SettingsContext';
 export const queryKeys = {
   mySprintJiras: ['jira', 'sprint-tickets'] as const,
   jiraTicket: (jiraId: string) => ['jira', 'ticket', jiraId] as const,
+  jiraChildIssues: (parentKey: string) => ['jira', 'child-issues', parentKey] as const,
   myCodeReviews: ['github', 'code-reviews'] as const,
   myPRs: (status: 'open' | 'closed') => ['github', 'my-prs', status] as const,
   prConversation: (repoName: string, prNumber: number) => ['github', 'pr-conversation', repoName, prNumber] as const,
@@ -123,6 +124,19 @@ const fetchJiraTicket = async (jiraId: string, jiraToken: string) => {
     throw new Error(`Failed to fetch JIRA ticket: ${response.status} ${response.statusText}`);
   }
 
+  return response.json();
+};
+
+// Fetch child issues for an epic/feature/parent
+const fetchJiraChildIssues = async (parentKey: string, jiraToken: string) => {
+  const response = await fetch('http://localhost:3017/api/jira-child-issues', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parentKey, token: jiraToken })
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch child issues: ${response.status} ${response.statusText}`);
+  }
   return response.json();
 };
 
@@ -782,6 +796,17 @@ export const useJiraTicket = (jiraId: string) => {
     enabled: !!jiraId && !!apiTokens.jira,
     staleTime: 2 * 60 * 1000, // 2 minutes for individual tickets
     retry: false, // Don't retry failed requests to prevent delayed error messages
+  });
+};
+
+export const useJiraChildIssues = (parentKey: string) => {
+  const { apiTokens } = useSettings();
+  return useQuery({
+    queryKey: queryKeys.jiraChildIssues(parentKey),
+    queryFn: () => fetchJiraChildIssues(parentKey, apiTokens.jira),
+    enabled: !!parentKey && !!apiTokens.jira,
+    staleTime: 2 * 60 * 1000,
+    retry: 1
   });
 };
 

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import CollapsibleSection from './CollapsibleSection';
 import JiraDescription from './JiraDescription';
 import JiraComments from './JiraComments';
+import JiraChildIssues from './JiraChildIssues';
 import { useJiraTicket } from '../hooks/useApiQueries';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatJiraTimestamp } from '../utils/formatting';
@@ -54,6 +55,9 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
   const hasEpic = !!epicKey;
   const hasParent = !!parentKey;
   const hasFeature = !!featureKey;
+  const issueTypeUpper = ticket.type?.toUpperCase();
+  const isEpic = issueTypeUpper === 'EPIC';
+  const isFeatureLike = issueTypeUpper === 'FEATURE' || issueTypeUpper === 'INITIATIVE';
 
   // Fetch summaries for tooltips (queries are disabled when key is falsy)
   const { data: epicData } = useJiraTicket(hasEpic ? epicKey! : '');
@@ -283,6 +287,17 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
       >
         <JiraDescription jiraKey={ticket.key} />
       </CollapsibleSection>
+
+      {/* Child Issues Section for Epic/Feature */}
+      {(isEpic || isFeatureLike) && (
+        <CollapsibleSection 
+          title={isEpic ? 'Issues in epic' : 'Child issues'}
+          isExpandedByDefault={false}
+          className="jira-children-section"
+        >
+          <JiraChildIssues parentKey={ticket.key} />
+        </CollapsibleSection>
+      )}
 
       {/* Comments Section */}
       <CollapsibleSection 

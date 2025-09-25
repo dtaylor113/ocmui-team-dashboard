@@ -981,6 +981,17 @@ html, body {
   color: #0052CC; /* Jira blue on hover */
 }
 
+/* Child Issues table font sizing to match jira card fields */
+.jira-child-issues-table {
+  font-size: 13px;
+}
+
+.jira-child-issues-table th,
+.jira-child-issues-table td {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
 /* ===== PR CARD STYLES ===== */
 .pr-card {
   background: rgba(26, 26, 26, 0.8);

@@ -496,6 +496,71 @@ app.post('/api/jira-sprint-tickets', async (req, res) => {
 });
 
 
+// Fetch child issues for an Epic or Feature
+// Request body: { parentKey: string, token: string }
+// Returns: { success, total, issues: [{ key, summary, assignee, status, type }] }
+app.post('/api/jira-child-issues', async (req, res) => {
+    const { parentKey, token } = req.body;
+    if (!parentKey || !token) {
+        return res.status(400).json({ error: 'parentKey and token are required' });
+    }
+
+    try {
+        // JQL: find issues where parent = KEY (subtasks), "Epic Link" = KEY (epic children), or "Parent Link" = KEY (feature/initiative)
+        const jql = `parent = ${parentKey} OR "Epic Link" = ${parentKey} OR "Parent Link" = ${parentKey}`;
+        const encodedJql = encodeURIComponent(jql);
+
+        const apiPath = `/rest/api/2/search?jql=${encodedJql}&maxResults=100&fields=key,summary,assignee,status,issuetype`;
+
+        const options = {
+            hostname: 'issues.redhat.com',
+            path: apiPath,
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'OCMUI-Team-Dashboard'
+            }
+        };
+
+        const jiraRequest = https.request(options, (jiraRes) => {
+            let data = '';
+            jiraRes.on('data', (chunk) => { data += chunk; });
+            jiraRes.on('end', () => {
+                if (jiraRes.statusCode === 200) {
+                    try {
+                        const searchResult = JSON.parse(data);
+                        const issues = (searchResult.issues || []).map((issue) => ({
+                            key: issue.key,
+                            summary: issue.fields?.summary || 'No summary',
+                            assignee: issue.fields?.assignee?.displayName || 'Unassigned',
+                            status: issue.fields?.status?.name || 'Unknown',
+                            type: issue.fields?.issuetype?.name || 'Task'
+                        }));
+                        res.json({ success: true, total: searchResult.total || issues.length, issues });
+                    } catch (e) {
+                        res.status(500).json({ error: 'Failed to parse JIRA response', details: e.message });
+                    }
+                } else {
+                    res.status(jiraRes.statusCode).json({ error: `JIRA API error: ${jiraRes.statusCode}`, details: data });
+                }
+            });
+        });
+
+        jiraRequest.on('error', (error) => {
+            console.error('JIRA child issues request error:', error);
+            res.status(500).json({ error: 'Network error connecting to JIRA', details: error.message });
+        });
+
+        jiraRequest.end();
+    } catch (error) {
+        console.error('JIRA child issues fetch error:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+});
+
+
 // Serve React app for all other routes (SPA routing support)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../dist/index.html'));
