@@ -42,7 +42,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone git@github.com:dtaylor113/ocmui-team-dashboard.git
    cd ocmui-team-dashboard
    ```
 
@@ -105,18 +105,10 @@ yarn start
 
 ## 📖 Documentation
 
-- **[PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)** - Complete technical documentation
+- **[APP_TECH_NOTES.md](APP_TECH_NOTES.md)** - Complete technical documentation
 - **Component Architecture** - Detailed React component structure
 - **API Integration** - GitHub and JIRA API usage patterns
 - **Deployment Guide** - Production setup instructions
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
 
 ## 📄 License
 

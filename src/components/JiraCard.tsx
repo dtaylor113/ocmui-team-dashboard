@@ -38,12 +38,12 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
   const { userPreferences } = useSettings();
   useEffect(() => {
     // Lazy cleanup of old localStorage keys
-    try {
-      const { cleanupOldJiraCommentKeys } = require('../utils/jiraCommentNotifications');
-      cleanupOldJiraCommentKeys();
-    } catch {}
+    import('../utils/jiraCommentNotifications')
+      .then(({ cleanupOldJiraCommentKeys }) => {
+        cleanupOldJiraCommentKeys();
+      })
+      .catch(() => {});
   }, []);
-  const commentsCount = ticketData?.success && ticketData?.ticket?.comments ? ticketData.ticket.comments.length : 0;
   const newCommentsCount = ticketData?.success && ticketData?.ticket?.comments 
     ? countNewJiraCommentsSinceLastViewed(ticket.key, ticketData.ticket.comments)
     : 0;

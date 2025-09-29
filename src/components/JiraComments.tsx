@@ -24,8 +24,8 @@ const JiraComments: React.FC<JiraCommentsProps> = ({ jiraKey }) => {
 
   const ticket = data.ticket;
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
+  const formatDate = (dateInput: string | number | Date): string => {
+    const date = new Date(dateInput);
     return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short', 
