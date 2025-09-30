@@ -44,6 +44,7 @@ server/index.js (ESM)
 - /api/test-jira            # JIRA token validation
 - /api/jira-ticket          # Single JIRA ticket lookup
 - /api/jira-sprint-tickets  # Sprint JIRAs for user
+- /api/jira-child-issues    # Child issues for Epic/Feature/parent (JQL-based)
 ```
 
 The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. It also acts as a JIRA proxy to bypass CORS restrictions in browser environments. The `/api/jira-ticket` endpoint includes each comment’s `updated` timestamp (when present) so the UI can detect edited comments.
@@ -173,6 +174,33 @@ yarn start:dev
 - **GitHub Images**: Inline when accessible; graceful fallback to styled links when blocked/expired
 - **No persistent caching by default**: The server exposes optional cache endpoints, but the frontend does not use them. Images are primarily proxied.
 - **Single-server Mode**: Same-origin serving improves reliability and performance
+
+---
+
+## ⏰ Team Timeboard - Data, Behavior, and Timezone Logic
+
+### Data source and persistence
+- Seed members: `/timeboard/members.json` (served from the production build; generated from `public/timeboard/members.json`).
+- User edits persist in `localStorage` (`ocmui_timeboard_members`).
+- Load order: prefer `localStorage` if present, else fetch the seed JSON.
+- Reload action: fetches `/timeboard/members.json`, normalizes objects to `{ name, role, tz }`, and overwrites `localStorage`.
+
+Development notes:
+- `yarn start` runs `yarn build` first, so changes in `public/timeboard/members.json` are picked up automatically.
+- `yarn start:dev` serves directly from `public/` via Vite; no build needed.
+
+### Inline editing model
+- Edit and add are inline in the table with Save/Cancel. During edit, “Local Time” and “Offset” cells show em dashes and are recomputed after Save/Cancel.
+- The modal is dismissible only via the close button (×); the backdrop click does not close it.
+
+### Timezone list and display
+- IANA timezone dropdown uses `Intl.supportedValuesOf('timeZone')` when available; otherwise falls back to a small curated list of common zones.
+- Each option label is `IANA — UTC±hh[:mm]` computed via `Intl.DateTimeFormat(..., { timeZoneName: 'shortOffset' })`.
+- Options are sorted by current UTC offset by default (then by IANA name).
+- All time calculations are DST-aware via `Intl.DateTimeFormat` with the specific `timeZone`.
+
+### Identity selection
+- “I am …” sets `userPreferences.timezone` to the selected member’s `tz` and stores `ocmui_selected_team_member` in `localStorage`.
 
 ---
 

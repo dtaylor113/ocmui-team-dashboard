@@ -200,6 +200,8 @@ html, body {
   gap: 12px;
 }
 
+/* removed reload note */
+
 .timeboard-search {
   background: #2a2a2a;
   border: 1px solid #444;
@@ -262,12 +264,13 @@ html, body {
 }
 
 .timeboard-ctrl select {
-  background: #2a2a2a;
+  background: #000000;
   border: 1px solid #444;
   border-radius: 4px;
   padding: 3px 6px;
   color: #e5e7eb;
   font-size: 12px;
+  appearance: none;
 }
 
 .timeboard-identity-btn {
@@ -313,7 +316,7 @@ html, body {
 
 .timeboard-main {
   flex: 1;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
 }
@@ -344,23 +347,22 @@ html, body {
   border-bottom: 1px solid #2a2a2a;
   color: #e5e7eb;
   font-size: 12px;
+  vertical-align: middle;
 }
 
-.timeboard-table tbody {
-  display: block;
-  max-height: 65vh;
-  overflow-y: auto;
-}
-
-.timeboard-table thead,
-.timeboard-table tr {
-  display: table;
-  width: 100%;
+.timeboard-table {
   table-layout: fixed;
 }
 
 .timeboard-table tr:hover {
   background: #2a2a2a;
+}
+
+/* Debug borders to visualize column alignment */
+.timeboard-table.debug,
+.timeboard-table.debug th,
+.timeboard-table.debug td {
+  border: 1px solid #555 !important;
 }
 
 .timeboard-note {
@@ -520,12 +522,14 @@ html, body {
 }
 
 .timeboard-btn-danger {
-  background: #dc2626;
-  border-color: #b91c1c;
+  background: #000000;
+  border-color: #444;
+  color: #e5e7eb;
 }
 
 .timeboard-btn-danger:hover {
-  background: #b91c1c;
+  background: #0a0a0a;
+  border-color: #666;
 }
 
 .timeboard-btn-small {

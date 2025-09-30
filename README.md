@@ -15,7 +15,7 @@
   - Age-based urgency for PR badges (white/yellow/red outline)
   - “Needs Rebase” badge on PRs when branch is behind or has conflicts
   - “Ready to Merge” badge when 3+ approvals, checks pass, and branch is up-to-date (hides Checks badge)
-- 
+
 ## 📱 Interface
 
 ### Navigation Tabs
@@ -28,10 +28,10 @@
 - **Auto-Association**: Click any JIRA to see related PRs, or any PR to see related JIRAs
 - **Rich Markdown**: Full GitHub and JIRA markdown rendering with image support
 - **Smart Caching**: Background updates with React Query
-- **Timezone Awareness**: All timestamps in your selected timezone
-- **Team Dashboard**: View all team members' local times simultaneously
- - **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled “(edited)”
- - **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
+- **Timezone Awareness**: All timestamps in your selected timezone (DST-aware via IANA timezones)
+- **Team Dashboard**: Inline add/edit/delete of members; identity selection (“I am …”); reference time mode; timezone dropdown labeled with current UTC offset and sortable by offset
+- **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled “(edited)”
+- **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
 
 ## 🚀 Quick Start
 
@@ -86,6 +86,7 @@ yarn start:dev
 - **Business Hours Detection**: Visual indicators for off-hours
 - **Identity Selection**: "I am..." feature for easy timezone setup
 - **Reference Time Mode**: Compare times across timezones
+- **DST-aware IANA Timezones**: Dropdown options show current UTC offset; list can be sorted by offset; all renders use IANA rules for correct DST handling
 
 ## 🐛 Troubleshooting
 

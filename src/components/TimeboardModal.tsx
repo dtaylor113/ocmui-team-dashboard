@@ -4,7 +4,6 @@ import { useSettings } from '../contexts/SettingsContext';
 interface TeamMember {
   name: string;
   role: string;
-  location: string;
   tz: string;
 }
 
@@ -27,21 +26,28 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   const [referenceMode, setReferenceMode] = useState<'now' | 'ref'>('now');
   const [refHour, setRefHour] = useState(9);
   const [refTz, setRefTz] = useState('America/New_York');
-  const [editingMemberIndex, setEditingMemberIndex] = useState(-1);
-  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  // Inline editing state
+  const [editingIndex, setEditingIndex] = useState<number | null>(null); // -1 for new, otherwise index
+  const [draftMember, setDraftMember] = useState<TeamMember>({ name: '', role: '', tz: '' });
   
   // "I am..." functionality
   const [showIdentitySelection, setShowIdentitySelection] = useState(false);
   const [selectedIdentity, setSelectedIdentity] = useState<TeamMember | null>(null);
   const [timeRefreshKey, setTimeRefreshKey] = useState(0); // For triggering time updates
   
-  // Form state for member management
-  const [memberForm, setMemberForm] = useState({
-    name: '',
-    role: '',
-    location: '',
-    tz: ''
-  });
+  // No separate form; inline row editing uses draftMember
+
+  // Utilities for safe timezone handling
+  const isValidTimezone = (tz: string): boolean => {
+    try {
+      if (!tz) return false;
+      // Use Intl API to validate; throws RangeError for invalid tz
+      new Intl.DateTimeFormat('en-US', { timeZone: tz }).format(new Date());
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   // Load members on mount
   useEffect(() => {
@@ -84,7 +90,11 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       if (stored) {
         const customMembers = JSON.parse(stored);
         if (customMembers && customMembers.length > 0) {
-          setMembers(customMembers);
+          // Backward compatibility: drop unknown fields like location
+          const cleaned = customMembers
+            .map((m: any) => ({ name: m.name, role: m.role, tz: m.tz }))
+            .filter((m: any) => isValidTimezone(m.tz)); // guard invalid tz from previous saves
+          setMembers(cleaned);
           console.log(`🕐 Loaded ${customMembers.length} team members from localStorage`);
           return;
         }
@@ -94,7 +104,10 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       const response = await fetch('/timeboard/members.json');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const membersData = await response.json();
-      setMembers(membersData);
+      const cleaned = (Array.isArray(membersData) ? membersData : [])
+        .map((m: any) => ({ name: m.name, role: m.role, tz: m.tz }))
+        .filter((m: any) => isValidTimezone(m.tz));
+      setMembers(cleaned);
       console.log(`🕐 Loaded ${membersData.length} team members from JSON`);
     } catch (error) {
       console.error('🕐 Failed to load members:', error);
@@ -104,18 +117,71 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
 
   const saveMembers = async (newMembers: TeamMember[]) => {
     try {
-      localStorage.setItem('ocmui_timeboard_members', JSON.stringify(newMembers));
+      // Filter out any invalid timezones before persisting
+      const sanitized = newMembers.filter(m => isValidTimezone(m.tz));
+      localStorage.setItem('ocmui_timeboard_members', JSON.stringify(sanitized));
       console.log(`🕐 Saved ${newMembers.length} team members to localStorage`);
-      setMembers(newMembers);
+      setMembers(sanitized);
     } catch (error) {
       console.error('🕐 Failed to save members:', error);
     }
   };
 
-  // Get unique timezones for reference dropdown
-  const uniqueTimezones = useMemo(() => {
-    return [...new Set(members.map(m => m.tz))].sort();
+  // Full IANA timezone list (with fallback to common + present team tzs)
+  const commonTzFallback = [
+    'America/Los_Angeles','America/Denver','America/Chicago','America/New_York',
+    'Europe/London','Europe/Amsterdam','Europe/Berlin','Europe/Rome','Europe/Prague',
+    'Asia/Jerusalem','Asia/Singapore','Asia/Tokyo','Australia/Sydney','Asia/Kolkata'
+  ];
+  const allTimezones = useMemo(() => {
+    try {
+      const supported = (Intl as any).supportedValuesOf?.('timeZone');
+      if (Array.isArray(supported) && supported.length > 0) {
+        return supported as string[];
+      }
+    } catch {}
+    return Array.from(new Set([ ...members.map(m => m.tz), ...commonTzFallback ])).sort();
   }, [members]);
+
+  const getTimezoneLabel = (tz: string): string => {
+    try {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(now);
+      const name = parts.find(p => p.type === 'timeZoneName')?.value || '';
+      // Normalize name like "GMT+5:30" or "UTC+5:30" into "UTC+5:30"
+      const labelOffset = name.replace('GMT', 'UTC');
+      return `${tz} — ${labelOffset}`;
+    } catch {
+      return tz;
+    }
+  };
+
+  // Optional: sort TZs by current offset for easier scanning
+  const [sortTzByOffset, setSortTzByOffset] = useState(true);
+  const tzWithSort = useMemo(() => {
+    if (!sortTzByOffset) return allTimezones;
+    const now = new Date();
+    const withOffset = allTimezones.map(tz => {
+      try {
+        const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(now);
+        const name = parts.find(p => p.type === 'timeZoneName')?.value || 'UTC+0';
+        // Parse offset minutes
+        const m = /([+-])(\d{1,2})(?::?(\d{2}))?/.exec(name);
+        let minutes = 0;
+        if (m) {
+          const sign = m[1] === '-' ? -1 : 1;
+          const hh = Number(m[2] || 0);
+          const mm = Number(m[3] || 0);
+          minutes = sign * (hh * 60 + mm);
+        }
+        return { tz, minutes };
+      } catch {
+        return { tz, minutes: 0 };
+      }
+    });
+    withOffset.sort((a, b) => a.minutes - b.minutes || a.tz.localeCompare(b.tz));
+    return withOffset.map(x => x.tz);
+  }, [sortTzByOffset, allTimezones]);
 
   // Current local time string (updates with timer)
   const currentLocalTime = useMemo(() => {
@@ -127,13 +193,13 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     });
   }, [timeRefreshKey]); // Updates when timer ticks
 
-  // Set default reference timezone when members load
+  // Set default reference timezone when timezones change
   useEffect(() => {
-    if (uniqueTimezones.length > 0 && !uniqueTimezones.includes(refTz)) {
+    if (allTimezones.length > 0 && !allTimezones.includes(refTz)) {
       const ny = "America/New_York";
-      setRefTz(uniqueTimezones.includes(ny) ? ny : uniqueTimezones[0]);
+      setRefTz(allTimezones.includes(ny) ? ny : allTimezones[0]);
     }
-  }, [uniqueTimezones, refTz]);
+  }, [allTimezones, refTz]);
 
   // Calculate reference date/time
   const getReferenceDate = (): Date => {
@@ -255,17 +321,18 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       .sort((a, b) => a.sortKey - b.sortKey); // Sort by local time (earliest first)
   }, [members, searchFilter, referenceMode, refHour, refTz, timeRefreshKey]);
 
-  // Member management functions
-
-  const closeManageModal = () => {
-    setIsManageModalOpen(false);
-    clearMemberForm();
-    setEditingMemberIndex(-1);
+  // Inline member management functions
+  const startEditByKey = (memberKey: { name: string; tz: string }) => {
+    const idx = members.findIndex(m => m.name === memberKey.name && m.tz === memberKey.tz);
+    if (idx >= 0) {
+      setEditingIndex(idx);
+      setDraftMember({ ...members[idx] });
+    }
   };
 
-  const clearMemberForm = () => {
-    setMemberForm({ name: '', role: '', location: '', tz: '' });
-    setEditingMemberIndex(-1);
+  const startAdd = () => {
+    setEditingIndex(-1);
+    setDraftMember({ name: '', role: '', tz: refTz || 'America/New_York' });
   };
 
   // Identity selection functions
@@ -306,17 +373,6 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     return baseClass;
   };
 
-  const editMember = (index: number) => {
-    const member = members[index];
-    setMemberForm({
-      name: member.name,
-      role: member.role,
-      location: member.location,
-      tz: member.tz
-    });
-    setEditingMemberIndex(index);
-  };
-
   const deleteMember = async (index: number) => {
     if (confirm(`Delete ${members[index].name}?`)) {
       const newMembers = [...members];
@@ -325,56 +381,64 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const saveMember = async () => {
-    const { name, role, location, tz } = memberForm;
-    
-    if (!name.trim() || !role.trim() || !location.trim() || !tz) {
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setDraftMember({ name: '', role: '', tz: '' });
+  };
+
+  const saveDraft = async () => {
+    const { name, role, tz } = draftMember;
+    if (!name.trim() || !role.trim() || !tz) {
       alert('Please fill in all fields');
       return;
     }
-
-    const memberData = {
-      name: name.trim(),
-      role: role.trim(),
-      location: location.trim(),
-      tz
-    };
-
-    let newMembers = [...members];
-    
-    if (editingMemberIndex >= 0) {
-      // Update existing member
-      newMembers[editingMemberIndex] = memberData;
-    } else {
-      // Add new member
-      newMembers.push(memberData);
+    if (!isValidTimezone(tz)) {
+      alert('Please choose a valid timezone from the list. You can search by city name like Bangalore.');
+      return;
     }
-
+    const trimmed: TeamMember = { name: name.trim(), role: role.trim(), tz };
+    let newMembers = [...members];
+    if (editingIndex === -1) {
+      newMembers.unshift(trimmed);
+    } else if (editingIndex !== null && editingIndex >= 0) {
+      newMembers[editingIndex] = trimmed;
+    }
     await saveMembers(newMembers);
-    clearMemberForm();
+    cancelEdit();
   };
 
-  // Timezone options for member form
-  const timezoneOptions = [
-    { value: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific)' },
-    { value: 'America/Denver', label: 'America/Denver (Mountain)' },
-    { value: 'America/Chicago', label: 'America/Chicago (Central)' },
-    { value: 'America/New_York', label: 'America/New_York (Eastern)' },
-    { value: 'Europe/London', label: 'Europe/London (UK)' },
-    { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam (Netherlands)' },
-    { value: 'Europe/Berlin', label: 'Europe/Berlin (Germany)' },
-    { value: 'Europe/Rome', label: 'Europe/Rome (Italy)' },
-    { value: 'Europe/Prague', label: 'Europe/Prague (Czech Republic)' },
-    { value: 'Asia/Jerusalem', label: 'Asia/Jerusalem (Israel)' },
-    { value: 'Asia/Singapore', label: 'Asia/Singapore (Singapore)' },
-    { value: 'Asia/Tokyo', label: 'Asia/Tokyo (Japan)' },
-    { value: 'Australia/Sydney', label: 'Australia/Sydney (Australia)' }
-  ];
+  // Export/Reload actions
+  const exportMembersToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(members, null, 2));
+      alert('Members copied to clipboard as JSON');
+    } catch (e) {
+      console.error('Failed to copy members JSON:', e);
+      alert('Failed to copy to clipboard');
+    }
+  };
+
+  const reloadMembersJson = async () => {
+    if (!confirm('Reload from Public/timeboard/members.json and overwrite browser cookies/localStorage?')) return;
+    try {
+      const response = await fetch('/timeboard/members.json');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const cleaned = (Array.isArray(data) ? data : []).map((m: any) => ({ name: m.name, role: m.role, tz: m.tz }));
+      await saveMembers(cleaned);
+      console.log('Reloaded /timeboard/members.json into localStorage');
+    } catch (e) {
+      console.error('Failed to reload members.json:', e);
+      alert('Failed to reload members.json');
+    }
+  };
+
+  // (Removed legacy timezoneOptions; using allTimezones instead)
 
   if (!isOpen) return null;
 
   return (
-    <div className="timeboard-modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="timeboard-modal-backdrop">
       <div className="timeboard-modal-content">
         <div className="timeboard-modal-header">
           <div className="timeboard-header-left">
@@ -422,7 +486,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
             
-            {/* Right side: I am... + Members buttons */}
+            {/* Right side: Identity + Export/Reload + Add */}
             <div className="timeboard-right-controls">
               <button 
                 className={getIdentityButtonClass()}
@@ -432,13 +496,29 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                 {getIdentityButtonText()}
                 {!selectedIdentity && <span className="identity-alert">!</span>}
               </button>
-              
+
               <button
-                className="timeboard-manage-btn"
-                title="Manage Team Members"
-                onClick={() => setIsManageModalOpen(true)}
+                className="timeboard-btn timeboard-btn-small"
+                title="Export Members (Copy JSON)"
+                onClick={exportMembersToClipboard}
               >
-                👥
+                ⬆️ Export
+              </button>
+
+              <button
+                className="timeboard-btn timeboard-btn-small"
+                title="Reload members.json"
+                onClick={reloadMembersJson}
+              >
+                🔄 Reload members.json
+              </button>
+
+              <button
+                className="timeboard-btn timeboard-btn-small"
+                title="Add member"
+                onClick={startAdd}
+              >
+                ➕ Add
               </button>
             </div>
           </div>
@@ -464,17 +544,21 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                 </select>
               </div>
 
-              <div className="timeboard-ctrl" title="Reference timezone (from team tzs)">
+              <div className="timeboard-ctrl" title="Reference timezone">
                 <label htmlFor="refTz">TZ:</label>
                 <select
                   id="refTz"
                   value={refTz}
                   onChange={(e) => setRefTz(e.target.value)}
                 >
-                  {uniqueTimezones.map(tz => (
-                    <option key={tz} value={tz}>{tz}</option>
+                  {tzWithSort.map(tz => (
+                    <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
                   ))}
                 </select>
+                <label style={{ marginLeft: '8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <input type="checkbox" checked={sortTzByOffset} onChange={(e) => setSortTzByOffset(e.target.checked)} />
+                  <span style={{ fontSize: 12, color: '#9ca3af' }}>Sort by offset</span>
+                </label>
               </div>
             </>
           )}
@@ -485,14 +569,60 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
             <thead>
               <tr>
                 {showIdentitySelection && <th style={{width: '5%'}}></th>}
-                <th style={{width: showIdentitySelection ? '25%' : '28%'}}>Name</th>
-                <th style={{width: '16%'}}>Role</th>
-                <th style={{width: showIdentitySelection ? '25%' : '28%'}}>IANA TZ</th>
-                <th style={{width: '14%'}}>Local Time</th>
-                <th style={{width: '14%'}}>Offset</th>
+                <th style={{width: '20%'}}>Name</th>
+                <th style={{width: '10%'}}>Role</th>
+                <th style={{width: showIdentitySelection ? '22%' : '24%'}}>IANA TZ</th>
+                <th style={{width: '12%'}}>Local Time</th>
+                <th style={{width: '9%'}}>Offset</th>
+                <th style={{width: '11%'}}>Actions</th>
               </tr>
             </thead>
             <tbody>
+              {/* New member inline row */}
+              {editingIndex === -1 && (
+                <tr key="new-member-row">
+                  {showIdentitySelection && <td></td>}
+                  <td style={{ width: '20%' }}>
+                    <input
+                      type="text"
+                      placeholder="Name"
+                      value={draftMember.name}
+                      onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
+                      style={{ padding: '4px 6px', width: '120px', minWidth: '120px', maxWidth: '120px', display: 'inline-block' }}
+                      maxLength={25}
+                    />
+                  </td>
+                  <td style={{ width: '10%' }}>
+                    <input
+                      type="text"
+                      placeholder="Role"
+                      value={draftMember.role}
+                      onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
+                      style={{ padding: '4px 6px', width: '80px', minWidth: '80px', maxWidth: '80px', display: 'inline-block' }}
+                      maxLength={25}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={draftMember.tz}
+                      onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
+                    >
+                      <option value="">Select timezone…</option>
+                      {tzWithSort.map(tz => (
+                        <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="mono" colSpan={2}>—</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="timeboard-btn timeboard-btn-primary timeboard-btn-small" onClick={saveDraft}>Save</button>
+                      <button className="timeboard-btn timeboard-btn-secondary timeboard-btn-small" onClick={cancelEdit}>Cancel</button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
               {displayMembers.map((member) => (
                 <tr 
                   key={`${member.name}-${member.tz}`}
@@ -509,13 +639,82 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                       />
                     </td>
                   )}
-                  <td>{member.name}</td>
-                  <td className="muted">{member.role}</td>
-                  <td className="mono">{member.tz}</td>
-                  <td className={`mono ${member.off ? 'warn' : ''}`}>
-                    {member.local}
-                  </td>
-                  <td className="mono">{member.offset}</td>
+                  {/* Inline edit vs read-only */}
+                  {(() => {
+                    const idx = members.findIndex(m => m.name === member.name && m.tz === member.tz);
+                    const isEditing = editingIndex === idx;
+                    if (isEditing) {
+                      return (
+                        <>
+                          <td style={{ width: '20%' }}>
+                            <input
+                              type="text"
+                              value={draftMember.name}
+                              onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
+                              style={{ padding: '4px 6px', width: '120px', minWidth: '120px', maxWidth: '120px', display: 'inline-block' }}
+                              maxLength={25}
+                            />
+                          </td>
+                          <td style={{ width: '10%' }}>
+                            <input
+                              type="text"
+                              value={draftMember.role}
+                              onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
+                              style={{ padding: '4px 6px', width: '80px', minWidth: '80px', maxWidth: '80px', display: 'inline-block' }}
+                              maxLength={25}
+                            />
+                          </td>
+                          <td>
+                            <select
+                              value={draftMember.tz}
+                              onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
+                            >
+                              {tzWithSort.map(tz => (
+                                <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="mono">—</td>
+                          <td className="mono">—</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="timeboard-btn timeboard-btn-primary timeboard-btn-small" onClick={saveDraft}>Save</button>
+                              <button className="timeboard-btn timeboard-btn-secondary timeboard-btn-small" onClick={cancelEdit}>Cancel</button>
+                            </div>
+                          </td>
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        <td style={{ width: '20%' }}>{member.name}</td>
+                        <td className="muted" style={{ width: '10%' }}>{member.role}</td>
+                        <td className="mono">{member.tz}</td>
+                        <td className={`mono ${member.off ? 'warn' : ''}`}>{member.local}</td>
+                        <td className="mono">{member.offset}</td>
+                        <td>
+                          <button
+                            className="timeboard-btn timeboard-btn-secondary timeboard-btn-small"
+                            onClick={() => startEditByKey({ name: member.name, tz: member.tz })}
+                            title="Edit member"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="timeboard-btn timeboard-btn-danger timeboard-btn-small"
+                            onClick={() => {
+                              const delIdx = members.findIndex(m => m.name === member.name && m.tz === member.tz);
+                              if (delIdx >= 0) deleteMember(delIdx);
+                            }}
+                            title="Delete member"
+                            style={{ marginLeft: '6px' }}
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </>
+                    );
+                  })()}
                 </tr>
               ))}
             </tbody>
@@ -527,115 +726,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
           </footer>
         </main>
 
-        {/* Manage Members Modal */}
-        {isManageModalOpen && (
-          <div className="timeboard-sub-modal" onClick={(e) => e.target === e.currentTarget && closeManageModal()}>
-            <div className="timeboard-sub-modal-content">
-              <div className="timeboard-sub-modal-header">
-                <h2>Manage Team Members</h2>
-                <button className="timeboard-close-btn" onClick={closeManageModal}>×</button>
-              </div>
-              
-              <div className="timeboard-sub-modal-body">
-                <div className="timeboard-member-form">
-                  <div className="timeboard-form-group">
-                    <label htmlFor="memberName">Name</label>
-                    <input
-                      type="text"
-                      id="memberName"
-                      placeholder="Enter name"
-                      value={memberForm.name}
-                      onChange={(e) => setMemberForm(prev => ({ ...prev, name: e.target.value }))}
-                    />
-                  </div>
-                  
-                  <div className="timeboard-form-group">
-                    <label htmlFor="memberRole">Role</label>
-                    <input
-                      type="text"
-                      id="memberRole"
-                      placeholder="Enter role"
-                      value={memberForm.role}
-                      onChange={(e) => setMemberForm(prev => ({ ...prev, role: e.target.value }))}
-                    />
-                  </div>
-                  
-                  <div className="timeboard-form-group">
-                    <label htmlFor="memberLocation">Location</label>
-                    <input
-                      type="text"
-                      id="memberLocation"
-                      placeholder="Enter location description"
-                      value={memberForm.location}
-                      onChange={(e) => setMemberForm(prev => ({ ...prev, location: e.target.value }))}
-                    />
-                  </div>
-                  
-                  <div className="timeboard-form-group">
-                    <label htmlFor="memberTimezone">Timezone (IANA)</label>
-                    <select
-                      id="memberTimezone"
-                      value={memberForm.tz}
-                      onChange={(e) => setMemberForm(prev => ({ ...prev, tz: e.target.value }))}
-                    >
-                      <option value="">Select timezone...</option>
-                      {timezoneOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="timeboard-btn-group">
-                    <button 
-                      className="timeboard-btn timeboard-btn-secondary"
-                      onClick={clearMemberForm}
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      className="timeboard-btn timeboard-btn-primary"
-                      onClick={saveMember}
-                    >
-                      {editingMemberIndex >= 0 ? 'Update' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="timeboard-members-section">
-                  <h3>Current Members</h3>
-                  <div className="timeboard-members-list">
-        {members.map((member, memberIndex) => (
-          <div key={`${member.name}-${memberIndex}`} className="member-item">
-            <div className="member-info">
-              <div className="member-name">{member.name}</div>
-              <div className="member-details">{member.role} • {member.tz}</div>
-            </div>
-            <div className="member-actions">
-              <button
-                className="timeboard-btn timeboard-btn-secondary timeboard-btn-small"
-                onClick={() => editMember(memberIndex)}
-                title="Edit member"
-              >
-                ✏️
-              </button>
-              <button
-                className="timeboard-btn timeboard-btn-danger timeboard-btn-small"
-                onClick={() => deleteMember(memberIndex)}
-                title="Delete member"
-              >
-                🗑️
-              </button>
-            </div>
-          </div>
-        ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Inline-only management; nested modal removed */}
       </div>
     </div>
   );
