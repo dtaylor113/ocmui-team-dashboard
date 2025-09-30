@@ -172,7 +172,18 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
       tabIndex={onClick ? 0 : undefined}
     >
       <div className="jira-card-title">
-        <span className="jira-card-title-text">{ticket.key}: {ticket.summary}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <a 
+            href={`https://issues.redhat.com/browse/${ticket.key}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="jira-card-title-text"
+            title={`Open ${ticket.key}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {ticket.key}: {ticket.summary}
+          </a>
+        </span>
         <a 
           href={`https://issues.redhat.com/browse/${ticket.key}`} 
           target="_blank" 
@@ -232,49 +243,52 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
         {hasEpic && (
           <div className="jira-link-row" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
             <span className="jira-field-label">Epic Link:</span>
-            <a
-              href={`https://issues.redhat.com/browse/${epicKey}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              title={epicTooltip}
-              className="jira-link-value"
-              style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {epicKey}{epicData?.ticket?.summary ? `: ${epicData.ticket.summary}` : ''} ↗
-            </a>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <a
+                href={`https://issues.redhat.com/browse/${epicKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={epicTooltip}
+                className="jira-link-value"
+              >
+                {epicKey}{epicData?.ticket?.summary ? `: ${epicData.ticket.summary}` : ''} ↗
+              </a>
+            </span>
           </div>
         )}
         {hasParent && (
           <div className="jira-link-row" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
             <span className="jira-field-label">Parent Link:</span>
-            <a
-              href={`https://issues.redhat.com/browse/${parentKey}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              title={parentTooltip}
-              className="jira-link-value"
-              style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {parentKey}{parentData?.ticket?.summary ? `: ${parentData.ticket.summary}` : ''} ↗
-            </a>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <a
+                href={`https://issues.redhat.com/browse/${parentKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={parentTooltip}
+                className="jira-link-value"
+              >
+                {parentKey}{parentData?.ticket?.summary ? `: ${parentData.ticket.summary}` : ''} ↗
+              </a>
+            </span>
           </div>
         )}
         {hasFeature && (
           <div className="jira-link-row" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
             <span className="jira-field-label">Feature Link:</span>
-            <a
-              href={`https://issues.redhat.com/browse/${featureKey}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              title={featureTooltip}
-              className="jira-link-value"
-              style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
-              {featureKey}{featureData?.ticket?.summary ? `: ${featureData.ticket.summary}` : ''} ↗
-            </a>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <a
+                href={`https://issues.redhat.com/browse/${featureKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={featureTooltip}
+                className="jira-link-value"
+              >
+                {featureKey}{featureData?.ticket?.summary ? `: ${featureData.ticket.summary}` : ''} ↗
+              </a>
+            </span>
           </div>
         )}
       </div>

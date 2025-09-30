@@ -1150,6 +1150,11 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+.pr-badge.pr-needs-rebase {
+  background: #000000;
+  border-color: #fbbf24; /* Yellow warning border */
+  color: #fbbf24;
+}
 
 /* PR badge colors for state set dynamically via style prop */
 
@@ -2608,16 +2613,16 @@ html, body {
 
 .jira-card-title-text {
   cursor: pointer;
-  flex: 1;
   color: #3b82f6; /* Lighter blue for JIRA cards */
   font-weight: 500;
+  display: inline; /* avoid expanding clickable area */
 }
 
 .pr-card-title-text {
   cursor: pointer;
-  flex: 1;
   color: #ffffff; /* Strong white for GitHub PR cards */
   font-weight: 500;
+  display: inline; /* avoid expanding clickable area */
 }
 
 .error-state p {

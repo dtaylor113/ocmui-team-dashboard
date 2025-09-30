@@ -57,6 +57,9 @@ interface GitHubPR {
   // Enhanced data from detailed PR fetch
   reviewers?: GitHubReviewer[];
   repository_url?: string;
+  // Mergeability
+  mergeable_state?: string;
+  needsRebase?: boolean;
 }
 
 interface SprintJirasResponse {
@@ -324,7 +327,13 @@ const fetchMyPRs = async (githubUsername: string, githubToken: string, status: '
 };
 
 // Function to fetch detailed PR information including reviewers and comments
-const fetchPRDetails = async (repoUrl: string, prNumber: number, githubToken: string, currentUser: string): Promise<GitHubReviewer[]> => {
+// Returns reviewers plus mergeability info to support UI badges
+const fetchPRDetails = async (
+  repoUrl: string,
+  prNumber: number,
+  githubToken: string,
+  currentUser: string
+): Promise<{ reviewers: GitHubReviewer[]; mergeable_state?: string; needsRebase: boolean }> => {
   // Extract owner/repo from GitHub API URL
   // URLs are in format: https://api.github.com/repos/owner/repo/issues/123
   const repoMatch = repoUrl.match(/github\.com\/repos\/([^/]+)\/([^/]+)/);
@@ -607,7 +616,32 @@ const fetchPRDetails = async (repoUrl: string, prNumber: number, githubToken: st
       console.log(`✅ zherman0 found with state: ${hasZherman0.state}`);
     }
     
-    return sortedReviewers;
+    let mergeableState: string | undefined = prDetails?.mergeable_state;
+    // Consider both 'behind' (out-of-date) and 'dirty' (merge conflicts) as requiring rebase/update
+    let needsRebase: boolean = mergeableState === 'behind' || mergeableState === 'dirty';
+    // Fallback: if state is unknown, use compare endpoint to detect behind-by commits
+    if (!needsRebase && (!mergeableState || mergeableState === 'unknown')) {
+      try {
+        const baseRef = prDetails?.base?.ref;
+        const headRef = prDetails?.head?.ref;
+        if (baseRef && headRef) {
+          const compareUrl = `https://api.github.com/repos/${repoName}/compare/${encodeURIComponent(baseRef)}...${encodeURIComponent(headRef)}`;
+          const compareResp = await fetch(compareUrl, { headers });
+          if (compareResp.ok) {
+            const compareData = await compareResp.json();
+            if (typeof compareData?.behind_by === 'number' && compareData.behind_by > 0) {
+              needsRebase = true;
+              // Treat as behind for UI purposes
+              mergeableState = 'behind';
+            }
+          }
+        }
+      } catch {
+        // Silently ignore fallback failures
+      }
+    }
+
+    return { reviewers: sortedReviewers, mergeable_state: mergeableState, needsRebase };
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -636,9 +670,9 @@ export const enhancePRsWithReviewers = async (prs: GitHubPR[], githubToken: stri
       try {
         const url = pr.repository_url || pr.url;
         console.log(`🔄 Processing PR ${index + 1}/${prs.length}: #${pr.number} (${pr.title?.substring(0, 50)}...)`);
-        const reviewers = await fetchPRDetails(url, pr.number, githubToken, currentUser);
-        console.log(`✅ Enhanced PR #${pr.number} with ${reviewers.length} reviewers`);
-        return { ...pr, reviewers };
+        const details = await fetchPRDetails(url, pr.number, githubToken, currentUser);
+        console.log(`✅ Enhanced PR #${pr.number} with ${details.reviewers.length} reviewers (mergeable_state=${details.mergeable_state || 'unknown'})`);
+        return { ...pr, reviewers: details.reviewers, mergeable_state: details.mergeable_state, needsRebase: details.needsRebase };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`❌ Failed to fetch reviewers for PR #${pr.number}:`, {
@@ -646,7 +680,7 @@ export const enhancePRsWithReviewers = async (prs: GitHubPR[], githubToken: stri
           pr: { number: pr.number, title: pr.title?.substring(0, 50), url: pr.repository_url || pr.url }
         });
         // Return PR with empty reviewers but log the issue for debugging
-        return { ...pr, reviewers: [], _reviewerFetchError: errorMessage };
+        return { ...pr, reviewers: [], _reviewerFetchError: errorMessage } as unknown as GitHubPR;
       }
     })
   );

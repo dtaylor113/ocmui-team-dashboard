@@ -38,6 +38,9 @@ interface GitHubPR {
   // Enhanced data from detailed PR fetch
   reviewers?: GitHubReviewer[];
   repository_url?: string;
+  // Mergeability details
+  mergeable_state?: string;
+  needsRebase?: boolean;
 }
 
 // Helper function to extract repository name from PR object
@@ -161,7 +164,18 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
     <div className={`pr-card ${isSelected ? 'selected' : ''}`} onClick={handleCardClick}>
       {/* PR Title with external link and warning icon */}
       <div className="pr-card-title-section">
-        <span className="pr-card-title-text">#{pr.number} {pr.title}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <a 
+            href={pr.html_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pr-card-title-text"
+            title={`Open PR #${pr.number}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            #{pr.number} {pr.title}
+          </a>
+        </span>
         <div className="pr-card-actions">
           <a 
             href={pr.html_url} 
@@ -200,6 +214,11 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
         <span className="pr-badge pr-checks passed">
           Checks: <span className="check-value">Passed</span>
         </span>
+        {pr.needsRebase && (
+          <span className="pr-badge pr-needs-rebase" title={pr.mergeable_state === 'dirty' ? 'Merge conflicts with base branch' : 'This branch is out-of-date with the base branch'}>
+            Needs Rebase
+          </span>
+        )}
         {/* Author and date info */}
         <span className="pr-card-author-info">
           By {pr.user?.login || 'Unknown user'} • Created: {formatRelativeDateInTimezone(pr.created_at, userPreferences.timezone)} • Last Updated: {formatRelativeDateInTimezone(pr.updated_at, userPreferences.timezone)}
