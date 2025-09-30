@@ -70,6 +70,7 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
   const { userPreferences } = useSettings();
   const [selectedReviewer, setSelectedReviewer] = useState<string | null>(null);
   const [showJiraWarning, setShowJiraWarning] = useState(false);
+  const [copied, setCopied] = useState<boolean>(false);
   
   // Initialize notification system and cleanup old data
   useEffect(() => {
@@ -97,6 +98,20 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
   const repoName = getRepoName(pr);
   const { data: conversationData } = usePRConversation(repoName, pr.number);
   const conversationCount = conversationData?.comments ? conversationData.comments.length : 0;
+
+  const checkoutCmd = `gh pr checkout ${pr.number}`;
+
+  const handleCopyClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(checkoutCmd);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error('Failed to copy command:', err);
+      alert('Failed to copy to clipboard');
+    }
+  };
 
   const handleReviewerClick = (e: React.MouseEvent, reviewer: string) => {
     e.stopPropagation(); // Prevent PR card click
@@ -192,6 +207,18 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
           >
             ↗
           </a>
+          <button
+            className="pr-copy-btn"
+            onClick={handleCopyClick}
+            aria-label={`Copy: ${checkoutCmd}`}
+            title={copied ? 'Copied!' : checkoutCmd}
+          >
+            {/* Octicon-style Copy icon (two overlapping squares) */}
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" fill="currentColor">
+              <path d="M1.75 1A1.75 1.75 0 000 2.75v7.5C0 11.216.784 12 1.75 12H3v-1.5H1.75a.25.25 0 01-.25-.25v-7.5a.25.25 0 01.25-.25h7.5a.25.25 0 01.25.25V4H11V2.75A1.75 1.75 0 009.25 1h-7.5z"></path>
+              <path d="M5.75 5A1.75 1.75 0 004 6.75v7.5C4 15.216 4.784 16 5.75 16h7.5A1.75 1.75 0 0015 14.25v-7.5A1.75 1.75 0 0013.25 5h-7.5zM5.75 6.5h7.5a.25.25 0 01.25.25v7.5a.25.25 0 01-.25.25h-7.5a.25.25 0 01-.25-.25v-7.5a.25.25 0 01.25-.25z"></path>
+            </svg>
+          </button>
           {hasInvalidJiraIds && (
             <button
               className="jira-warning-icon"

@@ -2568,6 +2568,28 @@ html, body {
   gap: 4px; /* Smaller gap for vertical layout */
 }
 
+.pr-copy-btn {
+  color: #6b7280;
+  background: rgba(107, 114, 128, 0.1);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+}
+
+.pr-copy-btn:hover {
+  color: #fff;
+  background: #3b82f6;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
 .jira-warning-icon {
   background: #f59e0b; /* Amber background */
   color: white;
