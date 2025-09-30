@@ -89,6 +89,33 @@ interface MyPRsResponse {
 // }
 
 // API fetch functions
+// Helper to fetch all pages from GitHub REST endpoints that support pagination
+// Uses per_page=100 and iterates pages until a page returns fewer results than per_page
+// Limits to a reasonable number of pages to avoid excessive API usage.
+const fetchAllPages = async <T>(baseUrl: string, headers: Record<string, string>, perPage: number = 100, maxPages: number = 10): Promise<T[]> => {
+  const results: T[] = [];
+  let page = 1;
+  while (page <= maxPages) {
+    // Build URL with query params safely
+    const urlObj = new URL(baseUrl);
+    urlObj.searchParams.set('per_page', String(perPage));
+    urlObj.searchParams.set('page', String(page));
+
+    const response = await fetch(urlObj.toString(), { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch page ${page} for ${baseUrl}: ${response.status} ${response.statusText}`);
+    }
+
+    const items: T[] = await response.json();
+    results.push(...items);
+
+    if (!Array.isArray(items) || items.length < perPage) {
+      break; // No more pages
+    }
+    page += 1;
+  }
+  return results;
+};
 const fetchSprintJiras = async (jiraUsername: string, jiraToken: string): Promise<SprintJirasResponse> => {
   const response = await fetch('http://localhost:3017/api/jira-sprint-tickets', {
     method: 'POST',
@@ -317,33 +344,27 @@ const fetchPRDetails = async (repoUrl: string, prNumber: number, githubToken: st
   // console.log(`🚀 Starting fetchPRDetails for PR #${prNumber}`);
 
   try {
-    // Fetch reviews, comments, PR details, AND additional reviewer endpoints in parallel
-    const [reviewsResponse, commentsResponse, prDetailsResponse, requestedReviewersResponse] = await Promise.all([
-      fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}/reviews`, { headers }),
-      fetch(`https://api.github.com/repos/${repoName}/issues/${prNumber}/comments`, { headers }),
-      fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}`, { headers }),
-      fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}/requested_reviewers`, { headers }) // Additional endpoint
-    ]);
-    
-    // Debug: Log API response status
-    // console.log(`📞 API Responses for PR #${prNumber}:`, {...});
+    // Endpoints
+    const reviewsUrl = `https://api.github.com/repos/${repoName}/pulls/${prNumber}/reviews`;
+    const issueCommentsUrl = `https://api.github.com/repos/${repoName}/issues/${prNumber}/comments`;
+    const prDetailsUrl = `https://api.github.com/repos/${repoName}/pulls/${prNumber}`;
+    const requestedReviewersUrl = `https://api.github.com/repos/${repoName}/pulls/${prNumber}/requested_reviewers`;
 
-    if (!reviewsResponse.ok || !commentsResponse.ok || !prDetailsResponse.ok) {
-      const errorDetails = {
-        reviews: { status: reviewsResponse.status, statusText: reviewsResponse.statusText },
-        comments: { status: commentsResponse.status, statusText: commentsResponse.statusText },
-        prDetails: { status: prDetailsResponse.status, statusText: prDetailsResponse.statusText },
-        requestedReviewers: { status: requestedReviewersResponse.status, statusText: requestedReviewersResponse.statusText }
-      };
-      console.error(`❌ GitHub API Error for PR #${prNumber}:`, errorDetails);
-      throw new Error(`Failed to fetch PR details for #${prNumber}: reviews=${reviewsResponse.status}, comments=${commentsResponse.status}, prDetails=${prDetailsResponse.status}`);
-    }
-
+    // Fetch ALL review events and issue comments with pagination, and fetch PR details/requested reviewers in parallel
     const [reviews, generalComments, prDetails, requestedReviewersData] = await Promise.all([
-      reviewsResponse.json(),
-      commentsResponse.json(),
-      prDetailsResponse.json(),
-      requestedReviewersResponse.ok ? requestedReviewersResponse.json() : { users: [], teams: [] }
+      fetchAllPages<any>(reviewsUrl, headers),
+      fetchAllPages<any>(issueCommentsUrl, headers),
+      (async () => {
+        const resp = await fetch(prDetailsUrl, { headers });
+        if (!resp.ok) {
+          throw new Error(`Failed to fetch PR details: ${resp.status} ${resp.statusText}`);
+        }
+        return resp.json();
+      })(),
+      (async () => {
+        const resp = await fetch(requestedReviewersUrl, { headers });
+        return resp.ok ? resp.json() : { users: [], teams: [] };
+      })()
     ]);
 
     // Debug: Basic PR data (simplified logging)
@@ -509,6 +530,40 @@ const fetchPRDetails = async (repoUrl: string, prNumber: number, githubToken: st
         reviewerMap.set(reviewer, existing);
       }
     });
+
+    // FINAL STATE NORMALIZATION: Reflect most recent status based on current requested reviewers
+    // If a reviewer is currently requested, that represents the latest state in GitHub UI,
+    // even if they previously approved or requested changes. Override to 'review_requested'.
+    try {
+      const currentlyRequestedUsers: string[] = [
+        ...(Array.isArray(prDetails?.requested_reviewers) ? prDetails.requested_reviewers.map((u: any) => u?.login).filter(Boolean) : []),
+        ...(Array.isArray(requestedReviewersData?.users) ? requestedReviewersData.users.map((u: any) => u?.login).filter(Boolean) : [])
+      ];
+      const requestedSet = new Set(currentlyRequestedUsers);
+
+      requestedSet.forEach((login) => {
+        if (!login) return;
+        const existing = reviewerMap.get(login);
+        if (existing) {
+          reviewerMap.set(login, {
+            ...existing,
+            state: 'review_requested',
+            // Preserve existing hasComments and date; reflect current-user flag
+            isCurrentUser: login === currentUser
+          });
+        } else {
+          reviewerMap.set(login, {
+            username: login,
+            state: 'review_requested',
+            hasComments: false,
+            date: undefined,
+            isCurrentUser: login === currentUser
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('⚠️ Failed to normalize requested reviewers state:', e);
+    }
 
     // Sort reviewers to put current user first
     const sortedReviewers = Array.from(reviewerMap.values()).sort((a, b) => {

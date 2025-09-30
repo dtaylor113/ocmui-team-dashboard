@@ -28,7 +28,11 @@ const NavigationTabs: React.FC<NavigationTabsProps> = ({
             className={`secondary-tab ${currentTab === tab.id ? 'active' : ''}`}
             onClick={() => onTabChange(tab.id)}
           >
-            <img src={tab.icon} alt={tab.label} className="tab-icon" />
+            <img 
+              src={tab.icon} 
+              alt={tab.label} 
+              className={`tab-icon ${tab.id === 'my-code-reviews' || tab.id === 'my-prs' ? 'tab-icon-github' : ''}`} 
+            />
             <span className="tab-label">{tab.label}</span>
           </button>
         ))}

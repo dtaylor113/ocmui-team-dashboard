@@ -647,7 +647,8 @@ html, body {
 }
 
 /* Make GitHub icons larger in tabs */
-.tab-icon[src*="githubIcon"] {
+/* Explicit class so production data URLs still match */
+.tab-icon-github {
   width: 32px;
   height: 32px;
 }
