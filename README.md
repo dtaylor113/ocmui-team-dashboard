@@ -13,6 +13,8 @@
   - PR reviewer badges show a top-right notification circle for new or edited comments since last view
   - JIRA Comments section shows a superscript notification badge for new or edited comments since last view
   - Age-based urgency for PR badges (white/yellow/red outline)
+  - “Needs Rebase” badge on PRs when branch is behind or has conflicts
+  - “Ready to Merge” badge when 3+ approvals, checks pass, and branch is up-to-date (hides Checks badge)
 - 
 ## 📱 Interface
 
@@ -29,6 +31,7 @@
 - **Timezone Awareness**: All timestamps in your selected timezone
 - **Team Dashboard**: View all team members' local times simultaneously
  - **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled “(edited)”
+ - **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
 
 ## 🚀 Quick Start
 

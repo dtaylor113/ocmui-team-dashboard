@@ -1156,6 +1156,13 @@ html, body {
   color: #fbbf24;
 }
 
+/* Ready to Merge badge */
+.pr-badge.pr-ready-merge {
+  background: #000000;
+  border-color: #22c55e; /* Green border */
+  color: #22c55e;
+}
+
 /* PR badge colors for state set dynamically via style prop */
 
 .pr-badge.pr-checks {

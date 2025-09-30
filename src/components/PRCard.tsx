@@ -41,6 +41,11 @@ interface GitHubPR {
   // Mergeability details
   mergeable_state?: string;
   needsRebase?: boolean;
+  // Checks status
+  checksState?: 'success' | 'failure' | 'pending' | 'error';
+  checksSummary?: string;
+  checksTotal?: number;
+  checksSucceeded?: number;
 }
 
 // Helper function to extract repository name from PR object
@@ -210,10 +215,24 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
         >
           {pr.state.toUpperCase()}
         </span>
-        {/* Checks status badge - neutral label with colored value */}
-        <span className="pr-badge pr-checks passed">
-          Checks: <span className="check-value">Passed</span>
-        </span>
+        {/* Ready to Merge badge (3+ approvals, no rebase needed, checks passed) */}
+        {(() => {
+          const approvals = (pr.reviewers || []).filter(r => r.state === 'approved').length;
+          const checksPassed = pr.checksState === 'success';
+          const readyToMerge = approvals >= 3 && !pr.needsRebase && checksPassed;
+          if (readyToMerge) {
+            return (
+              <span className="pr-badge pr-ready-merge" title={pr.checksSummary || '3+ approvals, checks passed, up-to-date with base'}>
+                Ready to Merge
+              </span>
+            );
+          }
+          return (
+            <span className={`pr-badge pr-checks ${pr.checksState === 'success' ? 'passed' : (pr.checksState === 'failure' || pr.checksState === 'error') ? 'failed' : ''}`} title={pr.checksSummary || 'Checks status unknown'}>
+              Checks: <span className="check-value">{pr.checksState ? (pr.checksState === 'success' ? 'Passed' : pr.checksState.charAt(0).toUpperCase() + pr.checksState.slice(1)) : 'Unknown'}</span>
+            </span>
+          );
+        })()}
         {pr.needsRebase && (
           <span className="pr-badge pr-needs-rebase" title={pr.mergeable_state === 'dirty' ? 'Merge conflicts with base branch' : 'This branch is out-of-date with the base branch'}>
             Needs Rebase

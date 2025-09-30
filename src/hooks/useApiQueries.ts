@@ -60,6 +60,11 @@ interface GitHubPR {
   // Mergeability
   mergeable_state?: string;
   needsRebase?: boolean;
+  // Checks/Statuses
+  checksState?: 'success' | 'failure' | 'pending' | 'error';
+  checksSummary?: string;
+  checksTotal?: number;
+  checksSucceeded?: number;
 }
 
 interface SprintJirasResponse {
@@ -327,13 +332,21 @@ const fetchMyPRs = async (githubUsername: string, githubToken: string, status: '
 };
 
 // Function to fetch detailed PR information including reviewers and comments
-// Returns reviewers plus mergeability info to support UI badges
+// Returns reviewers plus mergeability and checks info to support UI badges
 const fetchPRDetails = async (
   repoUrl: string,
   prNumber: number,
   githubToken: string,
   currentUser: string
-): Promise<{ reviewers: GitHubReviewer[]; mergeable_state?: string; needsRebase: boolean }> => {
+): Promise<{
+  reviewers: GitHubReviewer[];
+  mergeable_state?: string;
+  needsRebase: boolean;
+  checksState?: 'success' | 'failure' | 'pending' | 'error';
+  checksSummary?: string;
+  checksTotal?: number;
+  checksSucceeded?: number;
+}> => {
   // Extract owner/repo from GitHub API URL
   // URLs are in format: https://api.github.com/repos/owner/repo/issues/123
   const repoMatch = repoUrl.match(/github\.com\/repos\/([^/]+)\/([^/]+)/);
@@ -583,49 +596,24 @@ const fetchPRDetails = async (
       return a.username.localeCompare(b.username);
     });
 
-    // Final debug summary for troubleshooting missing reviewers
-    console.log(`✅ PR #${prNumber} final reviewer summary:`, {
-      totalReviewers: sortedReviewers.length,
-      reviewers: sortedReviewers.map(r => `${r.username}:${r.state}${r.hasComments ? '(has-comments)' : ''}`),
-      rawReviewsFound: reviews.length,
-      requestedReviewersFound: (prDetails?.requested_reviewers || []).length
-    });
-    
-    // 🔍 CRITICAL DEBUG: Check if zherman0 data was processed
-    const hasZherman0 = sortedReviewers.find(r => r.username === 'zherman0');
-    if (!hasZherman0) {
-      console.error(`❌ MISSING REVIEWER: zherman0 not found in final reviewer list for PR #${prNumber}`);
-      
-      // Simplified logging for missing reviewers (investigation complete)
-      console.log(`⚠️ Expected reviewer not found in PR #${prNumber} API data. This may be due to:`);
-      console.log(`   - Review was dismissed when new commits were pushed`);
-      console.log(`   - Reviewer never submitted a review for this PR`);
-      console.log(`   - Enterprise GitHub reviewer limitations`);
-      
-      // Show reviews with missing user.login
-      const reviewsWithoutUser = reviews.filter((r: any) => !r.user?.login);
-      if (reviewsWithoutUser.length > 0) {
-        console.log(`⚠️ Reviews without user.login (${reviewsWithoutUser.length}):`, reviewsWithoutUser.map((r: any) => ({
-          id: r.id,
-          state: r.state,
-          user: r.user,
-          submitted_at: r.submitted_at
-        })));
-      }
-    } else {
-      console.log(`✅ zherman0 found with state: ${hasZherman0.state}`);
-    }
+    // Final debug summary (muted): available for opt-in debugging if needed
+    // console.debug(`PR #${prNumber} reviewers:`, sortedReviewers.map(r => `${r.username}:${r.state}`));
     
     let mergeableState: string | undefined = prDetails?.mergeable_state;
     // Consider both 'behind' (out-of-date) and 'dirty' (merge conflicts) as requiring rebase/update
     let needsRebase: boolean = mergeableState === 'behind' || mergeableState === 'dirty';
     // Fallback: if state is unknown, use compare endpoint to detect behind-by commits
-    if (!needsRebase && (!mergeableState || mergeableState === 'unknown')) {
+    if (!needsRebase && (!mergeableState || mergeableState === 'unknown' || mergeableState === 'blocked')) {
       try {
         const baseRef = prDetails?.base?.ref;
         const headRef = prDetails?.head?.ref;
+        // Owners (support cross-fork compares using owner:ref syntax)
+        const baseOwner = prDetails?.base?.repo?.owner?.login || owner;
+        const headOwner = prDetails?.head?.repo?.owner?.login || prDetails?.head?.user?.login;
         if (baseRef && headRef) {
-          const compareUrl = `https://api.github.com/repos/${repoName}/compare/${encodeURIComponent(baseRef)}...${encodeURIComponent(headRef)}`;
+          const baseParam = baseOwner ? `${baseOwner}:${baseRef}` : baseRef;
+          const headParam = headOwner ? `${headOwner}:${headRef}` : headRef;
+          const compareUrl = `https://api.github.com/repos/${repoName}/compare/${encodeURIComponent(baseParam)}...${encodeURIComponent(headParam)}`;
           const compareResp = await fetch(compareUrl, { headers });
           if (compareResp.ok) {
             const compareData = await compareResp.json();
@@ -641,7 +629,55 @@ const fetchPRDetails = async (
       }
     }
 
-    return { reviewers: sortedReviewers, mergeable_state: mergeableState, needsRebase };
+    // Fetch combined status for checks (using head commit SHA)
+    let checksState: 'success' | 'failure' | 'pending' | 'error' | undefined;
+    let checksSummary: string | undefined;
+    let checksTotal: number | undefined;
+    let checksSucceeded: number | undefined;
+    try {
+      const headSha: string | undefined = prDetails?.head?.sha;
+      if (headSha) {
+        const statusUrl = `https://api.github.com/repos/${repoName}/commits/${headSha}/status`;
+        const statusResp = await fetch(statusUrl, { headers });
+        if (statusResp.ok) {
+          const statusData = await statusResp.json();
+          const state = String(statusData?.state || '').toLowerCase();
+          checksState = (state as any);
+          const statuses: any[] = Array.isArray(statusData?.statuses) ? statusData.statuses : [];
+          const total = statuses.length;
+          const succeeded = statuses.filter((s: any) => String(s?.state || '').toLowerCase() === 'success').length;
+          const failingStatuses = statuses.filter((s: any) => ['failure', 'error'].includes(String(s?.state || '').toLowerCase()));
+          const failing = failingStatuses.length;
+          const pendingStatuses = statuses.filter((s: any) => String(s?.state || '').toLowerCase() === 'pending');
+          const pending = pendingStatuses.length;
+          checksTotal = total;
+          checksSucceeded = succeeded;
+          if (state === 'success') {
+            checksSummary = `All checks have passed${total ? ` (${total} successful checks)` : ''}`;
+          } else if (state === 'pending') {
+            const pendingNames = pendingStatuses.map((s: any) => s?.context).filter(Boolean);
+            checksSummary = `Checks pending${total ? ` (${pending} pending of ${total}${pendingNames.length ? `: ${pendingNames.slice(0,3).join(', ')}${pendingNames.length>3 ? '…' : ''}` : ''})` : ''}`;
+          } else if (state === 'failure' || state === 'error') {
+            const failingNames = failingStatuses.map((s: any) => s?.context).filter(Boolean);
+            checksSummary = `Checks failed${total ? ` (${failing} failing of ${total}${failingNames.length ? `: ${failingNames.slice(0,3).join(', ')}${failingNames.length>3 ? '…' : ''}` : ''})` : ''}`;
+          } else if (total) {
+            checksSummary = `Checks status: ${state} (${succeeded}/${total} passed)`;
+          }
+        }
+      }
+    } catch {
+      // ignore checks failures
+    }
+
+    return {
+      reviewers: sortedReviewers,
+      mergeable_state: mergeableState,
+      needsRebase,
+      checksState,
+      checksSummary,
+      checksTotal,
+      checksSucceeded
+    };
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -671,8 +707,17 @@ export const enhancePRsWithReviewers = async (prs: GitHubPR[], githubToken: stri
         const url = pr.repository_url || pr.url;
         console.log(`🔄 Processing PR ${index + 1}/${prs.length}: #${pr.number} (${pr.title?.substring(0, 50)}...)`);
         const details = await fetchPRDetails(url, pr.number, githubToken, currentUser);
-        console.log(`✅ Enhanced PR #${pr.number} with ${details.reviewers.length} reviewers (mergeable_state=${details.mergeable_state || 'unknown'})`);
-        return { ...pr, reviewers: details.reviewers, mergeable_state: details.mergeable_state, needsRebase: details.needsRebase };
+        console.log(`✅ Enhanced PR #${pr.number} with ${details.reviewers.length} reviewers (mergeable_state=${details.mergeable_state || 'unknown'}, checks=${details.checksState || 'n/a'})`);
+        return {
+          ...pr,
+          reviewers: details.reviewers,
+          mergeable_state: details.mergeable_state,
+          needsRebase: details.needsRebase,
+          checksState: details.checksState,
+          checksSummary: details.checksSummary,
+          checksTotal: details.checksTotal,
+          checksSucceeded: details.checksSucceeded
+        };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`❌ Failed to fetch reviewers for PR #${pr.number}:`, {

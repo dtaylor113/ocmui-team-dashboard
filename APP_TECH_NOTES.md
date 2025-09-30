@@ -134,6 +134,30 @@ yarn start:dev
 - **Background Refetch**: Automatic updates at tuned intervals
 - **Reviewer Discovery**: Aggregates data across multiple GitHub endpoints. Reviewer notification counts use last-click timestamps (localStorage) and consider both created and updated times.
 
+#### GitHub PR Details Enhancements (2025-09)
+- Pagination added for heavy endpoints:
+  - `GET /repos/{owner}/{repo}/pulls/{number}/reviews` (all pages)
+  - `GET /repos/{owner}/{repo}/issues/{number}/comments` (all pages)
+- Reviewer aggregation rules:
+  - Current requested reviewers are surfaced as `review_requested`, overriding prior states (approved/changes_requested) to match GitHub’s active “Awaiting review”.
+  - Otherwise precedence is strongest prior state: `approved > changes_requested > commented`.
+- Mergeability detection for rebase signaling:
+  - “Needs Rebase” is true when `mergeable_state` is `behind` or `dirty`.
+  - Fallback when state is `unknown` or `blocked`: call `GET /compare/{base}...{head}` and set “Needs Rebase” if `behind_by > 0`.
+  - Compare supports forks using `owner:ref` syntax for both sides.
+- Checks status (no extra APIs required):
+  - Uses combined status: `GET /repos/{owner}/{repo}/commits/{sha}/status`.
+  - Captures `checksState` (success/failure/pending/error), counts, and a concise `checksSummary` that lists up to 3 failing/pending contexts for badge tooltips.
+
+#### UI Badges & Rules (PRCard)
+- “Checks” badge reflects real GitHub status (with tooltip showing failing/pending contexts).
+- “Needs Rebase” badge appears when out-of-date or conflicts are detected (see logic above).
+- “Ready to Merge” badge shows when:
+  - At least 3 reviewers have `approved`
+  - No rebase needed
+  - `checksState === 'success'`
+  - When “Ready to Merge” is shown, the separate “Checks” badge is hidden to reduce noise.
+
 ### Styling & UI
 - Single `App.css` with organized sections
 - Dark theme optimized for developers
