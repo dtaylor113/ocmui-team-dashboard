@@ -184,16 +184,6 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
             {ticket.key}: {ticket.summary}
           </a>
         </span>
-        <a 
-          href={`https://issues.redhat.com/browse/${ticket.key}`} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="jira-external-link"
-          onClick={(e) => e.stopPropagation()}
-          title="Open JIRA ticket"
-        >
-          ↗
-        </a>
       </div>
       
       <div className="jira-card-badges">

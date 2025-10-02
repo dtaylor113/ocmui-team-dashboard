@@ -46,6 +46,35 @@ const saveNotificationData = (data: NotificationData): void => {
 };
 
 /**
+ * Ensure timestamps exist for the provided reviewers on an already-initialized PR entry.
+ * Does NOT overwrite existing reviewer timestamps and does nothing if the PR has not been initialized.
+ */
+export const addMissingReviewerTimestamps = (repoName: string, prNumber: number, reviewers: string[]): void => {
+  const data = getNotificationData();
+  const prKey = generatePRKey(repoName, prNumber);
+  const prData = data[prKey];
+
+  if (!prData) {
+    // Respect the fresh-start approach; do not auto-create on late calls
+    return;
+  }
+
+  let changed = false;
+  const now = Date.now();
+  reviewers.forEach((username) => {
+    if (username && !(username in prData)) {
+      prData[username] = now;
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    data[prKey] = prData;
+    saveNotificationData(data);
+  }
+};
+
+/**
  * Get last clicked timestamp for a specific reviewer on a specific PR
  */
 export const getLastClickedTime = (repoName: string, prNumber: number, username: string): number | null => {

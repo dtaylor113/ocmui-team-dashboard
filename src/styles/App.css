@@ -273,6 +273,11 @@ html, body {
   appearance: none;
 }
 
+/* Reference row spacing */
+.timeboard-ref-row {
+  margin-top: 12px;
+}
+
 .timeboard-identity-btn {
   padding: 6px 12px;
   border-radius: 6px;
@@ -1139,7 +1144,7 @@ html, body {
 .pr-card-badges {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 2px;
   flex-wrap: wrap;
 }
 
@@ -1205,6 +1210,7 @@ html, body {
 }
 
 .pr-card-reviewers {
+  margin-top: 2px;
   margin-bottom: 8px;
   display: flex;
   gap: 8px;
@@ -2569,17 +2575,20 @@ html, body {
 }
 
 .pr-copy-btn {
-  color: #6b7280;
-  background: rgba(107, 114, 128, 0.1);
+  color: #9ca3af;
+  background: rgba(107, 114, 128, 0.08);
   border: 1px solid rgba(107, 114, 128, 0.2);
-  padding: 6px 10px;
-  border-radius: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 24px;
+  font-size: 13px; /* match metadata text */
+  line-height: 18px;
+  margin-left: 8px; /* space after Last Updated */
 }
 
 .pr-copy-btn:hover {

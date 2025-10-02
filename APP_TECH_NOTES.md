@@ -76,7 +76,7 @@ The server is implemented with **ES modules** (import/export) and serves the bui
 
 ### Advanced Components
 - **JiraCard**: Atlassian Document Format rendering; inline images; collapsible sections; status (filled Atlassian colors), type & priority (black with colored borders and icons); Comments title with superscript new/edited badge; comments sorted by recent activity and labeled “(edited)” when applicable
-- **PRCard**: GitHub Flavored Markdown; full conversation + review comments; GitHub-themed badges; reviewer notification circles for new/edited comments since last view; PR Checks with camel-cased values and colored word/border
+- **PRCard**: GitHub Flavored Markdown; full conversation + review comments; GitHub-themed badges; reviewer notification circles for new/edited comments since last view; PR Checks with camel-cased values and colored word/border; Checkout button to copy `gh pr checkout <number>`
 - **TimeboardModal**: Team timezone dashboard with member management and off-hours indicators
 
 ---
@@ -134,6 +134,13 @@ yarn start:dev
 - **Hooks**: Centralized in `hooks/useApiQueries.ts`
 - **Background Refetch**: Automatic updates at tuned intervals
 - **Reviewer Discovery**: Aggregates data across multiple GitHub endpoints. Reviewer notification counts use last-click timestamps (localStorage) and consider both created and updated times.
+
+#### Reviewer Notification System
+- Storage: `localStorage['reviewer-last-clicked']` stores per-PR, per-reviewer last-click timestamps (`"owner/repo#123": { "username": epoch_ms }`).
+- Initialization: When a PR is first viewed, timestamps are initialized for current reviewers to establish a “fresh start”. Late-appearing reviewers are backfilled with current time via `addMissingReviewerTimestamps` without overwriting existing values.
+- Counting: `getNotificationInfo(repo, prNumber, username, comments)` inspects all conversation comments (general PR comments, completed reviews with bodies, and inline review comments). For each comment by `username`, the newest of `created_at` or `updated_at` is compared with the last-click timestamp. Any creation or edit after last-click contributes to the unread count. Age-based urgency (normal/warning/urgent) derives from the newest unread activity.
+- Decoupled badge computation: Notification counting uses live conversation data and does not rely on previously cached `hasComments` flags, ensuring general comments and inline comments surface immediately.
+- Debugging: `window.debugNotifications` exposes helpers to inspect/clear localStorage for troubleshooting.
 
 #### GitHub PR Details Enhancements (2025-09)
 - Pagination added for heavy endpoints:
@@ -196,8 +203,13 @@ Development notes:
 ### Timezone list and display
 - IANA timezone dropdown uses `Intl.supportedValuesOf('timeZone')` when available; otherwise falls back to a small curated list of common zones.
 - Each option label is `IANA — UTC±hh[:mm]` computed via `Intl.DateTimeFormat(..., { timeZoneName: 'shortOffset' })`.
-- Options are sorted by current UTC offset by default (then by IANA name).
+- TZ dropdown sort is user-selectable: alphabetically by IANA name or by current GMT offset.
 - All time calculations are DST-aware via `Intl.DateTimeFormat` with the specific `timeZone`.
+
+### Reference time mode
+- Reference time input uses `<input type="time">` constrained to 09:00–17:00 with 30‑minute increments (step 1800). Internally represented as minutes since midnight (`refMinutes`).
+- Reference date construction computes UTC minutes from the selected reference TZ’s current offset, then renders each member’s local time for sorting and display.
+- Member rows are sorted by each person’s local time at the selected reference; this is independent of the TZ dropdown sort preference.
 
 ### Identity selection
 - “I am …” sets `userPreferences.timezone` to the selected member’s `tz` and stores `ocmui_selected_team_member` in `localStorage`.

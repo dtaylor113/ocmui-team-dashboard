@@ -24,7 +24,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [searchFilter, setSearchFilter] = useState('');
   const [referenceMode, setReferenceMode] = useState<'now' | 'ref'>('now');
-  const [refHour, setRefHour] = useState(9);
+  const [refMinutes, setRefMinutes] = useState(540); // 09:00 default (minutes since midnight)
   const [refTz, setRefTz] = useState('America/New_York');
   // Inline editing state
   const [editingIndex, setEditingIndex] = useState<number | null>(null); // -1 for new, otherwise index
@@ -220,8 +220,8 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     const tzName = parts.find(p => p.type === "timeZoneName")?.value || "GMT+0";
     const offsetMinutes = parseGmtOffset(tzName);
     
-    // Calculate UTC time for the reference hour in reference timezone
-    const utcMinutes = refHour * 60 - offsetMinutes;
+    // Calculate UTC time for the reference minutes in reference timezone
+    const utcMinutes = refMinutes - offsetMinutes;
     const hours = Math.floor(utcMinutes / 60);
     const minutes = utcMinutes % 60;
     
@@ -319,7 +319,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
         };
       })
       .sort((a, b) => a.sortKey - b.sortKey); // Sort by local time (earliest first)
-  }, [members, searchFilter, referenceMode, refHour, refTz, timeRefreshKey]);
+  }, [members, searchFilter, referenceMode, refMinutes, refTz, timeRefreshKey]);
 
   // Inline member management functions
   const startEditByKey = (memberKey: { name: string; tz: string }) => {
@@ -524,27 +524,24 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           {referenceMode === 'ref' && (
-            <>
+            <div className="timeboard-ref-row" style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
               <div className="timeboard-ctrl" title="Reference time (9am–5pm)">
-                <label htmlFor="refHour">Time:</label>
-                <select
-                  id="refHour"
-                  value={refHour}
-                  onChange={(e) => setRefHour(Number(e.target.value))}
-                >
-                  <option value={9}>9:00</option>
-                  <option value={10}>10:00</option>
-                  <option value={11}>11:00</option>
-                  <option value={12}>12:00</option>
-                  <option value={13}>1:00</option>
-                  <option value={14}>2:00</option>
-                  <option value={15}>3:00</option>
-                  <option value={16}>4:00</option>
-                  <option value={17}>5:00</option>
-                </select>
+                <label htmlFor="refTime">Time:</label>
+                <input
+                  id="refTime"
+                  type="time"
+                  step={1800}
+                  min="09:00"
+                  max="17:00"
+                  value={`${String(Math.floor(refMinutes / 60)).padStart(2, '0')}:${String(refMinutes % 60).padStart(2, '0')}`}
+                  onChange={(e) => {
+                    const [h, m] = e.target.value.split(':').map(Number);
+                    const mins = (isNaN(h) ? 9 : h) * 60 + (isNaN(m) ? 0 : m);
+                    setRefMinutes(Math.max(540, Math.min(1020, mins)));
+                  }}
+                />
               </div>
-
-              <div className="timeboard-ctrl" title="Reference timezone">
+              <div className="timeboard-ctrl" title="Reference timezone" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label htmlFor="refTz">TZ:</label>
                 <select
                   id="refTz"
@@ -557,10 +554,12 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                 </select>
                 <label style={{ marginLeft: '8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <input type="checkbox" checked={sortTzByOffset} onChange={(e) => setSortTzByOffset(e.target.checked)} />
-                  <span style={{ fontSize: 12, color: '#9ca3af' }}>Sort by offset</span>
+                  <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                    {sortTzByOffset ? 'Sort TZ dropdown by GMT offset' : 'Sort TZ dropdown alphabetically'}
+                  </span>
                 </label>
               </div>
-            </>
+            </div>
           )}
         </div>
 

@@ -7,7 +7,8 @@ import {
   initializeReviewerTimestamps, 
   getNotificationInfo, 
   updateLastClickedTime,
-  cleanupOldNotifications 
+  cleanupOldNotifications,
+  addMissingReviewerTimestamps 
 } from '../utils/reviewerNotifications';
 import { setupNotificationDebugTools } from '../utils/debugNotifications';
 import ReviewerCommentsModal from './ReviewerCommentsModal';
@@ -78,6 +79,8 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
       // Initialize timestamps for fresh start approach
       const reviewerUsernames = pr.reviewers.map(r => r.username);
       initializeReviewerTimestamps(getRepoName(pr), pr.number, reviewerUsernames);
+      // Backfill any missing reviewer timestamps for late-appearing commenters
+      addMissingReviewerTimestamps(getRepoName(pr), pr.number, reviewerUsernames);
     }
     
     // Periodic cleanup of old notification data (once per session)
@@ -106,7 +109,7 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
     try {
       await navigator.clipboard.writeText(checkoutCmd);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), 4000);
     } catch (err) {
       console.error('Failed to copy command:', err);
       alert('Failed to copy to clipboard');
@@ -197,28 +200,6 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
           </a>
         </span>
         <div className="pr-card-actions">
-          <a 
-            href={pr.html_url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="pr-external-link"
-            onClick={(e) => e.stopPropagation()}
-            title="Open PR on GitHub"
-          >
-            ↗
-          </a>
-          <button
-            className="pr-copy-btn"
-            onClick={handleCopyClick}
-            aria-label={`Copy: ${checkoutCmd}`}
-            title={copied ? 'Copied!' : checkoutCmd}
-          >
-            {/* Octicon-style Copy icon (two overlapping squares) */}
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false" fill="currentColor">
-              <path d="M1.75 1A1.75 1.75 0 000 2.75v7.5C0 11.216.784 12 1.75 12H3v-1.5H1.75a.25.25 0 01-.25-.25v-7.5a.25.25 0 01.25-.25h7.5a.25.25 0 01.25.25V4H11V2.75A1.75 1.75 0 009.25 1h-7.5z"></path>
-              <path d="M5.75 5A1.75 1.75 0 004 6.75v7.5C4 15.216 4.784 16 5.75 16h7.5A1.75 1.75 0 0015 14.25v-7.5A1.75 1.75 0 0013.25 5h-7.5zM5.75 6.5h7.5a.25.25 0 01.25.25v7.5a.25.25 0 01-.25.25h-7.5a.25.25 0 01-.25-.25v-7.5a.25.25 0 01.25-.25z"></path>
-            </svg>
-          </button>
           {hasInvalidJiraIds && (
             <button
               className="jira-warning-icon"
@@ -265,28 +246,35 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
             Needs Rebase
           </span>
         )}
-        {/* Author and date info */}
-        <span className="pr-card-author-info">
-          By {pr.user?.login || 'Unknown user'} • Created: {formatRelativeDateInTimezone(pr.created_at, userPreferences.timezone)} • Last Updated: {formatRelativeDateInTimezone(pr.updated_at, userPreferences.timezone)}
-        </span>
+        <button
+          className="pr-copy-btn"
+          onClick={handleCopyClick}
+          aria-label={`Checkout PR #${pr.number}`}
+          title={checkoutCmd}
+        >
+          {copied ? `'${checkoutCmd}' copied to clipboard` : `Checkout PR #${pr.number}`}
+        </button>
       </div>
+      {/* Author and date info moved below badges */}
+      <span className="pr-card-author-info">
+        By {pr.user?.login || 'Unknown user'} • Created: {formatRelativeDateInTimezone(pr.created_at, userPreferences.timezone)} • Last Updated: {formatRelativeDateInTimezone(pr.updated_at, userPreferences.timezone)}
+      </span>
       
       {/* Reviewers section */}
       <div className="pr-card-reviewers">
         <span className="pr-reviewers-label">Reviewers:</span>
         {pr.reviewers && pr.reviewers.length > 0 ? (
           pr.reviewers.map((reviewer) => {
-            // Get notification info including count and age-based urgency
-            const notificationInfo = reviewer.hasComments && conversationData?.comments ? 
-              getNotificationInfo(getRepoName(pr), pr.number, reviewer.username, conversationData.comments) : 
+            // Compute notification info based on live conversation data without gating on hasComments
+            const notificationInfo = conversationData?.comments ?
+              getNotificationInfo(getRepoName(pr), pr.number, reviewer.username, conversationData.comments) :
               { count: 0, urgency: 'none' as const, newestCommentAge: 0 };
             
             const { count: newCommentsCount, urgency } = notificationInfo;
             
             // Debug: Log notification badge rendering for this reviewer
-            if (reviewer.hasComments && conversationData?.comments) {
+            if (conversationData?.comments) {
               console.log(`🎯 PRCard rendering reviewer ${reviewer.username} for PR #${pr.number}:`, {
-                hasComments: reviewer.hasComments,
                 commentsAvailable: conversationData.comments.length,
                 notificationInfo,
                 willShowBadge: newCommentsCount > 0
@@ -296,9 +284,9 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
             return (
               <span 
                 key={reviewer.username}
-                className={`reviewer-badge ${getReviewerBadgeClass(reviewer)} ${reviewer.hasComments ? 'clickable-reviewer' : ''}`} 
-                onClick={reviewer.hasComments ? (e) => handleReviewerClick(e, reviewer.username) : undefined}
-                title={`${reviewer.username}${reviewer.isCurrentUser ? ' (You)' : ''}: ${getReviewerStateText(reviewer.state)}${reviewer.hasComments ? ' - Click to view comments' : ''}${newCommentsCount > 0 ? ` • ${newCommentsCount} new comment${newCommentsCount > 1 ? 's' : ''}!` : ''}`}
+                className={`reviewer-badge ${getReviewerBadgeClass(reviewer)} clickable-reviewer`} 
+                onClick={(e) => handleReviewerClick(e, reviewer.username)}
+                title={`${reviewer.username}${reviewer.isCurrentUser ? ' (You)' : ''}: ${getReviewerStateText(reviewer.state)} - Click to view comments${newCommentsCount > 0 ? ` • ${newCommentsCount} new comment${newCommentsCount > 1 ? 's' : ''}!` : ''}`}
               >
                 {getReviewerStateIcon(reviewer.state)} {reviewer.username}{reviewer.isCurrentUser ? ' (You)' : ''}
                 {newCommentsCount > 0 && (

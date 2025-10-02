@@ -15,6 +15,7 @@
   - Age-based urgency for PR badges (white/yellow/red outline)
   - “Needs Rebase” badge on PRs when branch is behind or has conflicts
   - “Ready to Merge” badge when 3+ approvals, checks pass, and branch is up-to-date (hides Checks badge)
+  - One-click “Checkout PR #<n>” button copies `gh pr checkout <n>`
 
 ## 📱 Interface
 
@@ -30,6 +31,7 @@
 - **Smart Caching**: Background updates with React Query
 - **Timezone Awareness**: All timestamps in your selected timezone (DST-aware via IANA timezones)
 - **Team Dashboard**: Inline add/edit/delete of members; identity selection (“I am …”); reference time mode; timezone dropdown labeled with current UTC offset and sortable by offset
+  - Reference Time input with 30‑minute steps (09:00–17:00) and TZ dropdown sortable alphabetically or by GMT offset
 - **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled “(edited)”
 - **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
 
@@ -85,8 +87,7 @@ yarn start:dev
 - **Multi-timezone Support**: View all team members' local times
 - **Business Hours Detection**: Visual indicators for off-hours
 - **Identity Selection**: "I am..." feature for easy timezone setup
-- **Reference Time Mode**: Compare times across timezones
-- **DST-aware IANA Timezones**: Dropdown options show current UTC offset; list can be sorted by offset; all renders use IANA rules for correct DST handling
+- **Reference Time Mode**: Choose a time (09:00–17:00, 30‑min steps) and TZ to compare teammates’ local times; TZ dropdown can be sorted alphabetically or by GMT offset; all renders use IANA rules for correct DST handling
 
 ## 🐛 Troubleshooting
 
