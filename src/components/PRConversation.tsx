@@ -13,7 +13,7 @@ const PRConversation: React.FC<PRConversationProps> = ({ repoName, prNumber }) =
   const { apiTokens, userPreferences } = useSettings();
   const [parsedComments, setParsedComments] = useState<Record<string, string>>({});
   const [parsingComments, setParsingComments] = useState(false);
-  const [sortMode, setSortMode] = useState<'github_default' | 'most_recent'>('github_default');
+  const [sortMode, setSortMode] = useState<'github_default' | 'most_recent'>('most_recent');
 
   // Parse comments when data changes
   useEffect(() => {
@@ -136,18 +136,18 @@ const PRConversation: React.FC<PRConversationProps> = ({ repoName, prNumber }) =
       <div className="conversation-controls">
         <div className="view-toggle">
           <button 
-            className={`toggle-btn ${sortMode === 'github_default' ? 'active' : ''}`}
-            onClick={() => setSortMode('github_default')}
-            title="GitHub's default conversation sorting (light threading)"
-          >
-            🐙 GitHub Default ({data.comments?.length || 0} comments)
-          </button>
-          <button 
             className={`toggle-btn ${sortMode === 'most_recent' ? 'active' : ''}`}
             onClick={() => setSortMode('most_recent')}
             title="Simple reverse chronological order (newest first)"
           >
             ⏰ Most Recent ({data.comments?.length || 0} comments)
+          </button>
+          <button 
+            className={`toggle-btn ${sortMode === 'github_default' ? 'active' : ''}`}
+            onClick={() => setSortMode('github_default')}
+            title="GitHub's default conversation sorting (light threading)"
+          >
+            🐙 GitHub Default ({data.comments?.length || 0} comments)
           </button>
         </div>
       </div>

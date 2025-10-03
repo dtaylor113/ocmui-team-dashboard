@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
+import slackIcon from '../assets/slack-dark-theme-icon.png';
 
 interface TeamMember {
   name: string;
@@ -720,8 +721,22 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
           </table>
           
           <footer className="timeboard-note">
-            Times shown are each teammate's local time at the selected reference. 
-            Off-hours (before 9am / after 5pm) are subtly highlighted in red. DST is automatic.
+            <div>
+              Times shown are each teammate's local time at the selected reference. 
+              Off-hours (before 9am / after 5pm) are subtly highlighted in red. DST is automatic.
+            </div>
+            <div style={{ marginTop: 8, textAlign: 'left' }}>
+              <a 
+                className="btn btn-feedback" 
+                href="https://redhat-internal.slack.com/app_redirect?channel=UA0LKKEMU" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                title="Open Slack web to DM dtaylor"
+              >
+                <img src={slackIcon} alt="Slack" className="btn-icon" />
+                Give feedback to dtaylor
+              </a>
+            </div>
           </footer>
         </main>
 

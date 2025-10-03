@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useSettings } from '../contexts/SettingsContext';
 import type { ApiTokens } from '../types/settings';
+import slackIcon from '../assets/slack-dark-theme-icon.png';
 
 const SettingsModal: React.FC = () => {
   const { 
@@ -197,12 +198,26 @@ const SettingsModal: React.FC = () => {
         </div>
 
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={closeSettingsModal}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleSave}>
-            Save
-          </button>
+          <div className="modal-footer-left">
+            <a 
+              className="btn btn-feedback" 
+              href="https://redhat-internal.slack.com/app_redirect?channel=UA0LKKEMU" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              title="Open Slack web to DM dtaylor"
+            >
+              <img src={slackIcon} alt="Slack" className="btn-icon" />
+              Give feedback to dtaylor
+            </a>
+          </div>
+          <div className="modal-footer-right">
+            <button className="btn btn-secondary" onClick={closeSettingsModal}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={handleSave}>
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>,

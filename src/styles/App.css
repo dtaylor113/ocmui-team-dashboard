@@ -2914,11 +2914,21 @@ html, body {
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
   padding: 20px 24px;
   border-top: 1px solid #333;
   background: #0f0f0f;
+}
+
+.modal-footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.modal-footer-right {
+  display: flex;
+  gap: 12px;
 }
 
 .btn {
@@ -2951,6 +2961,30 @@ html, body {
 .btn-primary:hover {
   background: #c0392b;
   border-color: #c0392b;
+}
+
+/* Smaller, black feedback button */
+.btn-feedback {
+  background: #000000;
+  border-color: #444;
+  color: #e5e7eb;
+  padding: 8px 12px; /* Smaller than default 12x24 */
+  font-size: 13px;   /* Slightly smaller text */
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-feedback:hover {
+  background: #0a0a0a;
+  border-color: #666;
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 3px;
 }
 
 .settings-alert {
