@@ -51,35 +51,7 @@ const PRPanel: React.FC<PRPanelProps> = ({ tabType, prStatus = 'open', onPrStatu
   const getTitle = () => {
     const count = data?.total || 0;
     if (tabType === 'my-code-reviews') {
-      const x = reviewingPRs.length;
-      const X = approvedPRs.length;
-      return (
-        <span>
-          I am 
-          <label style={{ marginLeft: 6, marginRight: 6 }}>
-            <input
-              type="radio"
-              name="review-filter-title"
-              value="reviewing"
-              checked={reviewFilter === 'reviewing'}
-              onChange={() => setReviewFilter('reviewing')}
-            />
-            {' '}reviewing {x}
-          </label>
-          PRs, and have 
-          <label style={{ marginLeft: 6 }}>
-            <input
-              type="radio"
-              name="review-filter-title"
-              value="approved"
-              checked={reviewFilter === 'approved'}
-              onChange={() => setReviewFilter('approved')}
-            />
-            {' '}approved {X}
-          </label>
-          {' '}PRs
-        </span>
-      );
+      return 'My Code Reviews';
     } else {
       const statusText = prStatus.charAt(0).toUpperCase() + prStatus.slice(1);
       return `I have ${count} ${statusText} PRs`;
@@ -102,31 +74,56 @@ const PRPanel: React.FC<PRPanelProps> = ({ tabType, prStatus = 'open', onPrStatu
   };
 
 
-  // Header controls: My PRs status toggle (Code Reviews radios are embedded in title)
-  const headerControls = tabType === 'my-prs' && onPrStatusChange ? (
-    <div className="pr-status-toggle">
-      <label>
-        <input 
-          type="radio" 
-          name="pr-status" 
-          value="open" 
-          checked={prStatus === 'open'}
-          onChange={() => onPrStatusChange('open')}
-        /> 
-        Open
-      </label>
-      <label>
-        <input 
-          type="radio" 
-          name="pr-status" 
-          value="closed" 
-          checked={prStatus === 'closed'}
-          onChange={() => onPrStatusChange('closed')}
-        /> 
-        Closed
-      </label>
-    </div>
-  ) : undefined;
+  // Header controls
+  const headerControls = (
+    tabType === 'my-prs' && onPrStatusChange ? (
+      <div className="pr-status-toggle">
+        <label>
+          <input 
+            type="radio" 
+            name="pr-status" 
+            value="open" 
+            checked={prStatus === 'open'}
+            onChange={() => onPrStatusChange('open')}
+          /> 
+          Open
+        </label>
+        <label>
+          <input 
+            type="radio" 
+            name="pr-status" 
+            value="closed" 
+            checked={prStatus === 'closed'}
+            onChange={() => onPrStatusChange('closed')}
+          /> 
+          Closed
+        </label>
+      </div>
+    ) : tabType === 'my-code-reviews' ? (
+      <div className="pr-status-toggle" role="radiogroup" aria-label="Review filter">
+        <label>
+          <input
+            type="radio"
+            name="review-filter"
+            value="reviewing"
+            checked={reviewFilter === 'reviewing'}
+            onChange={() => setReviewFilter('reviewing')}
+          />
+          Reviewing {reviewingPRs.length}
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="review-filter"
+            value="approved"
+            checked={reviewFilter === 'approved'}
+            onChange={() => setReviewFilter('approved')}
+          />
+          Approved {approvedPRs.length}
+        </label>
+      </div>
+    ) : undefined
+  );
 
   return (
     <BasePanel
