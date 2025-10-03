@@ -281,6 +281,15 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
               });
             }
             
+            // Show comment bubble next to '?' when reviewer is still review_requested but has left comments
+            const hasAnyComments = !!(
+              reviewer.hasComments ||
+              (conversationData?.comments?.some((c: any) => c?.user?.login === reviewer.username && (c?.body?.trim?.() || c?.has_body)) ?? false)
+            );
+            const stateIcon = reviewer.state === 'review_requested' && hasAnyComments
+              ? '? 💬'
+              : getReviewerStateIcon(reviewer.state);
+
             return (
               <span 
                 key={reviewer.username}
@@ -288,7 +297,7 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
                 onClick={(e) => handleReviewerClick(e, reviewer.username)}
                 title={`${reviewer.username}${reviewer.isCurrentUser ? ' (You)' : ''}: ${getReviewerStateText(reviewer.state)} - Click to view comments${newCommentsCount > 0 ? ` • ${newCommentsCount} new comment${newCommentsCount > 1 ? 's' : ''}!` : ''}`}
               >
-                {getReviewerStateIcon(reviewer.state)} {reviewer.username}{reviewer.isCurrentUser ? ' (You)' : ''}
+                {stateIcon} {reviewer.username}{reviewer.isCurrentUser ? ' (You)' : ''}
                 {newCommentsCount > 0 && (
                   <span className={`notification-badge notification-${urgency}`}>
                     {newCommentsCount}

@@ -15,6 +15,12 @@ interface AppState {
   currentTab: TabType;
 }
 
+const TAB_STORAGE_KEY = 'ocmui_current_tab';
+
+const isValidTab = (value: string): value is TabType => {
+  return tabConfig.some(t => t.id === value);
+};
+
 const tabConfig = [
   { 
     id: 'my-sprint-jiras' as TabType, 
@@ -39,14 +45,27 @@ const tabConfig = [
 ];
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>({
-    currentTab: 'my-sprint-jiras'
+  const [appState, setAppState] = useState<AppState>(() => {
+    try {
+      const stored = localStorage.getItem(TAB_STORAGE_KEY);
+      if (stored && isValidTab(stored)) {
+        return { currentTab: stored as TabType };
+      }
+    } catch {
+      // ignore storage errors and fall back to default
+    }
+    return { currentTab: 'my-sprint-jiras' };
   });
 
   const handleTabChange = (tab: TabType) => {
     setAppState({
       currentTab: tab
     });
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, tab);
+    } catch {
+      // ignore storage errors
+    }
   };
 
   return (
