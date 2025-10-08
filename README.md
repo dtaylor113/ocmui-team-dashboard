@@ -1,6 +1,7 @@
 # 🎯 OCMUI Team Dashboard
 
 > Modern React-based dashboard that unifies GitHub PR management with JIRA ticket tracking to streamline developer workflows for the Red Hat OCMUI team.
+![Team Dashboard – Main view](src/assets/team_dashboard_screenshot_1.png)
 
 ## ✨ Features
 
@@ -8,9 +9,11 @@
 - **📋 JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
 - **🌐 Unified Dashboard**: Single interface combining both platforms with auto-associations
 - **⏰ Team Timeboard**: Multi-timezone team dashboard with business hours detection
+![Team Timeboard](src/assets/team_dashboard_screenshot_2.png)
 - **🚀 Developer Productivity**: Reduce context switching between GitHub and JIRA
 - **🛎 Activity Badges**: 
-  - PR reviewer badges show a top-right notification circle for new or edited comments since last view
+  - PR reviewer badges show a top-right notification circle for new or edited comments since last view!
+  ![New Comment Badge Indicator](src/assets/team_dashboard_new_comment_badge_screenshot.png)
   - JIRA Comments section shows a superscript notification badge for new or edited comments since last view
   - Age-based urgency for PR badges (white/yellow/red outline)
   - “Needs Rebase” badge on PRs when branch is behind or has conflicts
@@ -65,7 +68,10 @@
    - Automatically opens in browser
 
 4. **Configure tokens**
+
+   - Open `http://localhost:3017`
    - Click Settings ⚙️ in the top-right corner
+   ![Settings Modal](src/assets/team_dashboard_settings_screenshot.png)
    - Add your GitHub personal access token
    - Add your JIRA token and email address
    - Settings are saved locally in your browser
