@@ -191,6 +191,64 @@ app.post('/api/jira-ticket', async (req, res) => {
                             }
                         } catch {}
                         
+                        // Discover Target Due Date (try multiple common field names)
+                        let targetDueDate = null;
+                        try {
+                            const dueDateCandidates = [
+                                'duedate', // Standard due date
+                                'customfield_12313941', // Common Red Hat JIRA Target Date
+                                'customfield_12313940', // Alternative Target Date
+                                'customfield_12310243', // Another common target date field
+                                'customfield_12311940',
+                                'customfield_12311941'
+                            ];
+                            
+                            // First pass: prioritize "Target end" and similar fields
+                            Object.keys(names).forEach((fieldId) => {
+                                const label = String(names[fieldId] || '').toLowerCase();
+                                if (label.includes('target end') || 
+                                    label.includes('target date') || 
+                                    label.includes('target start') || 
+                                    label.includes('due date')) {
+                                    if (!dueDateCandidates.includes(fieldId)) {
+                                        // Put Target end at the front
+                                        if (label.includes('target end')) {
+                                            dueDateCandidates.unshift(fieldId);
+                                        } else {
+                                            dueDateCandidates.push(fieldId);
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            // Log all available fields for debugging (first ticket only or when key matches debug pattern)
+                            if (ticketData.key.includes('STRAT') || ticketData.key.includes('EPIC')) {
+                                console.log(`🔍 Checking fields for ${ticketData.key} (${ticketData.fields.issuetype.name}):`);
+                                console.log('  Available date-like fields:', Object.keys(names).filter(f => {
+                                    const label = String(names[f] || '').toLowerCase();
+                                    return label.includes('target') || label.includes('date') || label.includes('due');
+                                }).map(f => `${f}=${names[f]}, value=${fields[f]}`));
+                            }
+                            
+                            for (const candidate of dueDateCandidates) {
+                                if (fields[candidate]) {
+                                    const value = fields[candidate];
+                                    // Accept date strings in format YYYY-MM-DD or ISO format
+                                    if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+                                        targetDueDate = value;
+                                        console.log(`✅ Found target date for ${ticketData.key}: ${targetDueDate} (field: ${candidate}, label: "${names[candidate] || 'unknown'}")`);
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (!targetDueDate && (ticketData.fields.issuetype.name === 'Epic' || ticketData.fields.issuetype.name === 'Feature' || ticketData.fields.issuetype.name === 'Outcome')) {
+                                console.log(`⚠️ No target date found for ${ticketData.key} (${ticketData.fields.issuetype.name})`);
+                            }
+                        } catch (e) {
+                            console.warn(`⚠️ Error discovering target date for ${ticketData.key}:`, e.message);
+                        }
+                        
                         res.json({
                             success: true,
                             ticket: {
@@ -204,6 +262,7 @@ app.post('/api/jira-ticket', async (req, res) => {
                                 reporter: ticketData.fields.reporter ? ticketData.fields.reporter.displayName : 'Unknown',
                                 created: ticketData.fields.created,
                                 updated: ticketData.fields.updated,
+                                duedate: targetDueDate,
                                 comments: comments,
                                 attachments: attachments, // Include attachment URL mapping
                                 parentKey: parentKey,

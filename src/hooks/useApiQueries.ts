@@ -23,6 +23,7 @@ interface JiraTicket {
   type: string;
   created: string;
   updated: string;
+  duedate?: string | null;
   sprint?: string;
 }
 

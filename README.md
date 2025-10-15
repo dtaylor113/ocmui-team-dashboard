@@ -7,9 +7,11 @@
 
 - **🔗 GitHub Integration**: Track PRs, code reviews, and repository activity  
 - **📋 JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
+- **Jira Hierarchy View**: Click any JIRA card to see a popup containing a hierarchy tree of all of it's parents.
+<img src="src/assets/JiraHierarchyPopup.png" alt="JIRA Hierarchy Popup" width="600">
 - **🌐 Unified Dashboard**: Single interface combining both platforms with auto-associations
 - **⏰ Team Timeboard**: Multi-timezone team dashboard with business hours detection
-![Team Timeboard](src/assets/team_dashboard_screenshot_2.png)
+<img src="src/assets/team_dashboard_screenshot_2.png" alt="Team Timeboard" width="600">
 - **🚀 Developer Productivity**: Reduce context switching between GitHub and JIRA
 - **🛎 Activity Badges**: 
   - PR reviewer badges show a top-right notification circle for new or edited comments since last view!

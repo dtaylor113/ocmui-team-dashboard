@@ -963,6 +963,16 @@ html, body {
   flex-shrink: 0;
 }
 
+/* Target End styling - bright white label and bold color-coded value */
+.jira-card-field:has(.jira-target-end-value) .jira-field-label {
+  color: #e5e7eb;
+}
+
+.jira-target-end-value {
+  font-weight: 700;
+  font-size: 14px;
+}
+
 .jira-field-value {
   color: #e5e7eb;
   font-weight: 500;
@@ -3748,4 +3758,138 @@ body.dark-theme .github-image-fallback:hover {
 
 .reviewer-badge:has(.notification-badge.notification-urgent):hover .notification-badge.notification-urgent {
   transform: translateY(-1px);
+}
+
+/* ===== JIRA HIERARCHY MODAL STYLES ===== */
+.hierarchy-modal {
+  max-width: 900px;
+  max-height: 85vh;
+}
+
+.hierarchy-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 4px 4px 8px;
+}
+
+.hierarchy-node {
+  background: rgba(26, 26, 26, 0.8);
+  border: 2px solid #444;
+  border-radius: 6px;
+  padding: 8px;
+  transition: all 0.2s ease;
+}
+
+.hierarchy-node.selected {
+  border-color: #1e40af;
+  background: rgba(30, 64, 175, 0.1);
+}
+
+.hierarchy-node:hover {
+  border-color: #666;
+}
+
+.hierarchy-node-header {
+  margin-bottom: 4px;
+}
+
+.hierarchy-node-title {
+  color: #60a5fa;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+  display: inline-block;
+  transition: color 0.2s ease;
+}
+
+.hierarchy-node-title:hover {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+
+.hierarchy-node-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.hierarchy-node-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hierarchy-metadata-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.hierarchy-field {
+  display: flex;
+  font-size: 12px;
+  color: #9ca3af;
+  flex: 1;
+  min-width: 0;
+}
+
+.hierarchy-field .jira-field-label {
+  font-weight: 600;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.hierarchy-field .jira-field-value {
+  color: #e5e7eb;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Target End styling for hierarchy modal - bright white label and bold color-coded value */
+.hierarchy-field:has(.hierarchy-target-end-value) .jira-field-label {
+  color: #e5e7eb;
+}
+
+.hierarchy-target-end-value {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* ===== HIERARCHY BUTTON STYLES ===== */
+.hierarchy-button {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #9ca3af;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.hierarchy-button:hover {
+  background: #3a3a3a;
+  border-color: #555;
+  color: #e5e7eb;
+  transform: scale(1.1);
+}
+
+/* ===== JIRA DUE DATE BADGE STYLES ===== */
+.jira-badge.jira-duedate {
+  border: 2px solid;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* Background and colors set inline via style prop for dynamic coloring */
 }

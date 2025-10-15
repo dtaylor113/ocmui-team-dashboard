@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import CollapsibleSection from './CollapsibleSection';
 import JiraDescription from './JiraDescription';
 import JiraComments from './JiraComments';
 import JiraChildIssues from './JiraChildIssues';
+import JiraHierarchyModal from './JiraHierarchyModal';
 import { useJiraTicket } from '../hooks/useApiQueries';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatJiraTimestamp } from '../utils/formatting';
@@ -22,6 +23,7 @@ interface JiraTicket {
   type: string;
   created: string;
   updated: string;
+  duedate?: string | null;
   sprint?: string;
 }
 
@@ -36,6 +38,7 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
   // Get full ticket data to access comments count (only if ticket exists and has key)
   const { data: ticketData } = useJiraTicket(ticket?.key || '');
   const { userPreferences } = useSettings();
+  const [isHierarchyModalOpen, setIsHierarchyModalOpen] = useState(false);
   useEffect(() => {
     // Lazy cleanup of old localStorage keys
     import('../utils/jiraCommentNotifications')
@@ -164,6 +167,56 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
     }
   };
 
+  const getDueDateColor = (duedate: string | null | undefined) => {
+    if (!duedate) return null;
+    
+    const due = new Date(duedate);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dueDateOnly = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+    
+    const diffTime = dueDateOnly.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Due this month (within 31 days) - orange
+    if (diffDays <= 31 && diffDays >= 0) {
+      return { border: '#ea580c', text: '#ea580c', background: '#000000' };
+    }
+    // Due next month (32-62 days) - yellow
+    if (diffDays > 31 && diffDays <= 62) {
+      return { border: '#eab308', text: '#eab308', background: '#000000' };
+    }
+    // Due in 1+ months - white text on black background
+    if (diffDays > 62) {
+      return { border: '#ffffff', text: '#ffffff', background: '#000000' };
+    }
+    // Overdue - red
+    return { border: '#ef4444', text: '#ef4444', background: '#000000' };
+  };
+
+  const formatDueDate = (duedate: string | null | undefined) => {
+    if (!duedate) return null;
+    const due = new Date(duedate);
+    return due.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      timeZone: userPreferences.timezone || 'UTC'
+    });
+  };
+
+  const duedate = ticketData?.ticket?.duedate || ticket.duedate;
+  const dueDateColorInfo = getDueDateColor(duedate);
+  const formattedDueDate = formatDueDate(duedate);
+  
+  // Debug logging for due dates
+  if (duedate && (ticket.type?.toUpperCase() === 'EPIC' || ticket.type?.toUpperCase() === 'FEATURE' || ticket.type?.toUpperCase() === 'OUTCOME' || ticket.type?.toUpperCase() === 'STRATEGIC GOAL')) {
+    console.log(`📅 ${ticket.key} (${ticket.type}): duedate=${duedate}, formatted=${formattedDueDate}, color=${JSON.stringify(dueDateColorInfo)}`);
+  }
+  
+  // Only show hierarchy button if the card has parent/epic/feature links
+  const hasHierarchy = hasEpic || hasParent || hasFeature;
+
   return (
     <div 
       className={`jira-card ${isSelected ? 'selected' : ''}`}
@@ -184,6 +237,19 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
             {ticket.key}: {ticket.summary}
           </a>
         </span>
+        {hasHierarchy && (
+          <button
+            className="hierarchy-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsHierarchyModalOpen(true);
+            }}
+            title="View JIRA Hierarchy"
+            aria-label="View JIRA Hierarchy"
+          >
+            ⧉
+          </button>
+        )}
       </div>
       
       <div className="jira-card-badges">
@@ -194,6 +260,7 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
           <span className="jira-badge-icon" aria-hidden="true">{getTypeIcon(ticket.type)}</span>
           {toTitleCase(ticket.type)}
         </span>
+        
         <span 
           className="jira-badge jira-priority" 
           style={{ borderColor: getPriorityColor(ticket.priority) }}
@@ -230,6 +297,24 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
             <span className="jira-field-value">{formatJiraTimestamp(ticket.created, userPreferences.timezone)}</span>
           </div>
         </div>
+        {formattedDueDate && dueDateColorInfo && (
+          <div className="jira-metadata-row">
+            <div className="jira-card-field">
+              {/* Empty space to align with left column */}
+            </div>
+            <div className="jira-card-field">
+              <span className="jira-field-label">Target End:</span>
+              <span 
+                className="jira-field-value jira-target-end-value"
+                style={{ 
+                  color: dueDateColorInfo.text
+                }}
+              >
+                {formattedDueDate}
+              </span>
+            </div>
+          </div>
+        )}
         {hasEpic && (
           <div className="jira-link-row" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
             <span className="jira-field-label">Epic Link:</span>
@@ -323,6 +408,13 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
       >
         <JiraComments jiraKey={ticket.key} />
       </CollapsibleSection>
+
+      {/* Hierarchy Modal */}
+      <JiraHierarchyModal
+        jiraKey={ticket.key}
+        isOpen={isHierarchyModalOpen}
+        onClose={() => setIsHierarchyModalOpen(false)}
+      />
     </div>
   );
 };
