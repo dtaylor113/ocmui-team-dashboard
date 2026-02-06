@@ -1596,6 +1596,627 @@ app.get('/api/unleash/flags', async (req, res) => {
     }
 });
 
+// ============================================================================
+// DOC LINKS HEALTH CHECK API ENDPOINTS
+// ============================================================================
+
+// URLs for the link definition files from uhc-portal
+// This mirrors what getAllExternalLinks() in urlUtils.mjs imports
+// Add new files here as they're added to uhc-portal (e.g., docLinks.mjs)
+const UHC_PORTAL_BASE_URL = process.env.UHC_PORTAL_BASE_URL || 
+    'https://raw.githubusercontent.com/RedHatInsights/uhc-portal/main/src/common';
+
+const DOC_LINKS_SOURCE_FILES = (process.env.DOC_LINKS_SOURCE_FILES || 
+    'installLinks.mjs,supportLinks.mjs,docLinks.mjs')
+    .split(',')
+    .map(f => f.trim())
+    .filter(Boolean);
+
+// Cache for doc links check results
+let docLinksCache = {
+    results: null,
+    summary: null,
+    lastChecked: null,
+    urlList: null,
+    urlListFetchedAt: null
+};
+const DOC_LINKS_CACHE_TTL = 60 * 60 * 1000; // 1 hour cache for results
+const DOC_LINKS_URL_LIST_TTL = 24 * 60 * 60 * 1000; // 24 hours for URL list
+
+// Fetch and parse URL list from uhc-portal files
+// This mirrors getAllExternalLinks() from urlUtils.mjs - fetches all source files in parallel
+const fetchDocLinkUrls = async () => {
+    const now = Date.now();
+    
+    // Return cached URL list if still valid
+    if (docLinksCache.urlList && docLinksCache.urlListFetchedAt && 
+        (now - docLinksCache.urlListFetchedAt) < DOC_LINKS_URL_LIST_TTL) {
+        return docLinksCache.urlList;
+    }
+    
+    console.log(`📋 Fetching doc link URLs from uhc-portal (${DOC_LINKS_SOURCE_FILES.length} source files)...`);
+    
+    const urls = new Set();
+    
+    // Helper to fetch and parse a .mjs file for URLs
+    const extractUrlsFromFile = async (filename) => {
+        const fileUrl = `${UHC_PORTAL_BASE_URL}/${filename}`;
+        return new Promise((resolve) => {
+            const url = new URL(fileUrl);
+            const options = {
+                hostname: url.hostname,
+                path: url.pathname,
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/plain',
+                    'User-Agent': 'OCMUI-Team-Dashboard'
+                }
+            };
+            
+            const req = https.request(options, (res) => {
+                let data = '';
+                res.on('data', chunk => { data += chunk; });
+                res.on('end', () => {
+                    if (res.statusCode === 404) {
+                        // File doesn't exist yet (e.g., docLinks.mjs before PR merges)
+                        console.log(`📋 ${filename}: not found (may not exist yet)`);
+                        resolve([]);
+                        return;
+                    }
+                    if (res.statusCode !== 200) {
+                        console.error(`📋 ${filename}: failed to fetch (${res.statusCode})`);
+                        resolve([]);
+                        return;
+                    }
+                    
+                    // Step 0: Remove commented-out code to avoid extracting URLs from comments
+                    // Remove single-line comments (// ...) but preserve the line structure
+                    // Remove multi-line comments (/* ... */)
+                    // IMPORTANT: Use \s// pattern to avoid matching // in URLs like `${BASE}//path`
+                    // The \s ensures we only match // after whitespace (actual comments)
+                    let cleanedData = data
+                        .replace(/\/\*[\s\S]*?\*\//g, '')  // Remove /* ... */ comments
+                        .replace(/\s\/\/[^'"`]*$/gm, '');  // Remove // comments after whitespace (not in strings)
+                    
+                    // Step 1: Extract all const declarations (const NAME = 'value' or "value")
+                    // This captures base URLs like MIRROR_CLIENTS_STABLE_X86, OCP_DOCS_BASE, etc.
+                    // Use original data for constants (they might be in comments for documentation)
+                    const constants = {};
+                    const constPattern = /const\s+([A-Z_][A-Z0-9_]*)\s*=\s*['"`]([^'"`]+)['"`]/g;
+                    let constMatch;
+                    while ((constMatch = constPattern.exec(data)) !== null) {
+                        constants[constMatch[1]] = constMatch[2];
+                    }
+                    
+                    // Step 2: Find all string values and template literals (from cleaned data)
+                    const foundUrls = [];
+                    
+                    // Pattern for simple string URLs: 'https://...' or "https://..." or `https://...`
+                    // Use cleanedData to skip commented-out URLs
+                    // Exclude newlines to avoid matching multi-line string declarations incorrectly
+                    // Also match backtick strings without interpolation
+                    const simpleUrlPattern = /['"`]((https?:\/\/[^'"`\n\r]+))['"`]/g;
+                    let match;
+                    while ((match = simpleUrlPattern.exec(cleanedData)) !== null) {
+                        const url = match[1];
+                        if (!url.includes('${')) {
+                            foundUrls.push(url);
+                        }
+                    }
+                    
+                    // Pattern for template literals: `${CONST}/path` or `${CONST}path`
+                    // Captures the full template literal content
+                    // Use cleanedData to skip commented-out URLs
+                    const templatePattern = /`(\$\{([A-Z_][A-Z0-9_]*)\}[^`]*)`/g;
+                    while ((match = templatePattern.exec(cleanedData)) !== null) {
+                        let templateValue = match[1];
+                        const constName = match[2];
+                        
+                        // Substitute the constant if we have it
+                        if (constants[constName]) {
+                            templateValue = templateValue.replace(`\${${constName}}`, constants[constName]);
+                        }
+                        
+                        // Check for any remaining ${...} that we might have missed
+                        // Try to resolve them from our constants
+                        const remainingVars = templateValue.match(/\$\{([A-Z_][A-Z0-9_]*)\}/g);
+                        if (remainingVars) {
+                            for (const varMatch of remainingVars) {
+                                const varName = varMatch.slice(2, -1); // Remove ${ and }
+                                if (constants[varName]) {
+                                    templateValue = templateValue.replace(varMatch, constants[varName]);
+                                }
+                            }
+                        }
+                        
+                        // Only add if it's a complete URL (no unresolved variables)
+                        if (templateValue.startsWith('http') && !templateValue.includes('${')) {
+                            foundUrls.push(templateValue);
+                        }
+                    }
+                    
+                    // Pattern for template literals with object property access: `${object.PROPERTY}/path`
+                    // e.g., `${links.OCM_CLI_RELEASES_LATEST}/ocm_linux_amd64.zip`
+                    const objectTemplatePattern = /`(\$\{([a-z]+)\.([A-Z_][A-Z0-9_]*)\}[^`]*)`/g;
+                    while ((match = objectTemplatePattern.exec(cleanedData)) !== null) {
+                        let templateValue = match[1];
+                        const objectName = match[2]; // e.g., 'links'
+                        const propertyName = match[3]; // e.g., 'OCM_CLI_RELEASES_LATEST'
+                        
+                        // Look up the property in the 'links' object within the same file
+                        // First, try to find it as a direct constant
+                        if (constants[propertyName]) {
+                            templateValue = templateValue.replace(`\${${objectName}.${propertyName}}`, constants[propertyName]);
+                        } else {
+                            // Try to find it in the links/supportLinks object definition
+                            // Pattern: PROPERTY_NAME: 'value' or PROPERTY_NAME: `template`
+                            const linkDefPattern = new RegExp(`${propertyName}:\\s*['"\`]([^'"\`]+)['"\`]`);
+                            const linkMatch = data.match(linkDefPattern);
+                            if (linkMatch) {
+                                let linkValue = linkMatch[1];
+                                // If the link value itself uses a constant, resolve it
+                                const constRef = linkValue.match(/\$\{([A-Z_][A-Z0-9_]*)\}/);
+                                if (constRef && constants[constRef[1]]) {
+                                    linkValue = linkValue.replace(constRef[0], constants[constRef[1]]);
+                                }
+                                templateValue = templateValue.replace(`\${${objectName}.${propertyName}}`, linkValue);
+                            }
+                        }
+                        
+                        // Only add if it's a complete URL (no unresolved variables)
+                        if (templateValue.startsWith('http') && !templateValue.includes('${')) {
+                            foundUrls.push(templateValue);
+                        }
+                    }
+                    
+                    // Step 3: Filter out base URLs that are just constants (not actual link targets)
+                    // These patterns indicate a base URL used to build other URLs, not a link itself
+                    // Note: We DON'T filter /latest$ because some URLs like github.com/.../releases/latest are valid
+                    // Note: We DON'T filter /support/$ because SUPPORT_HOME is a valid link target
+                    const baseUrlPatterns = [
+                        /\/html$/,                    // Docs base ending in /html
+                        /\/html\/$/,                  // Docs base ending in /html/
+                        /\/latest\/$/,                // Mirror base ending in /latest/ (with trailing slash = base path)
+                        /\/en$/,                      // Base path ending in /en
+                        /\/en\/$/,                    // Base path ending in /en/
+                        /\/articles\/$/,              // access.redhat.com/articles/ (base path only, not link target)
+                        /\/solutions\/$/,             // access.redhat.com/solutions/ (base path only, not link target)
+                        /\/security\/$/,              // access.redhat.com/security/ (base path only, not link target)
+                    ];
+                    
+                    // Also filter out URLs that exactly match constant values (they're base URLs)
+                    const constantValues = new Set(Object.values(constants));
+                    
+                    const filteredUrls = foundUrls.filter(url => {
+                        // Skip if it's an exact constant value (base URL)
+                        if (constantValues.has(url)) {
+                            return false;
+                        }
+                        // Skip if it matches a base URL pattern
+                        for (const pattern of baseUrlPatterns) {
+                            if (pattern.test(url)) {
+                                return false;
+                            }
+                        }
+                        // Skip URLs with control characters (malformed captures)
+                        if (/[\x00-\x1F]/.test(url)) {
+                            return false;
+                        }
+                        // Skip URLs with trailing spaces or text (malformed captures)
+                        if (/\s[A-Z_]+:/.test(url)) {
+                            return false;
+                        }
+                        return true;
+                    });
+                    
+                    console.log(`📋 ${filename}: found ${filteredUrls.length} URLs (filtered from ${foundUrls.length}, ${Object.keys(constants).length} constants)`);
+                    resolve(filteredUrls);
+                });
+            });
+            
+            req.on('error', (err) => {
+                console.error(`📋 ${filename}: error - ${err.message}`);
+                resolve([]);
+            });
+            req.end();
+        });
+    };
+    
+    try {
+        // Fetch all source files in parallel (mirrors getAllExternalLinks behavior)
+        const results = await Promise.all(
+            DOC_LINKS_SOURCE_FILES.map(extractUrlsFromFile)
+        );
+        
+        // Combine and deduplicate all URLs
+        results.flat().forEach(url => urls.add(url));
+        
+        const urlList = Array.from(urls).sort();
+        console.log(`📋 Total: ${urlList.length} unique URLs from ${DOC_LINKS_SOURCE_FILES.length} source files`);
+        
+        // Cache the URL list
+        docLinksCache.urlList = urlList;
+        docLinksCache.urlListFetchedAt = now;
+        
+        return urlList;
+    } catch (err) {
+        console.error('Error fetching doc link URLs:', err);
+        return docLinksCache.urlList || [];
+    }
+};
+
+// Check a single URL with HEAD request, fallback to GET on 405
+// This matches check-links.mjs behavior: fetchWithFallback()
+const checkUrl = async (url) => {
+    if (url.startsWith('mailto:')) {
+        return { url, status: 'skipped', category: 'skipped' };
+    }
+    
+    // Helper to make HTTP request
+    const makeRequest = (targetUrl, method) => {
+        return new Promise((resolve) => {
+            try {
+                const parsedUrl = new URL(targetUrl);
+                const isHttps = parsedUrl.protocol === 'https:';
+                const httpModule = isHttps ? https : require('http');
+                
+                const options = {
+                    hostname: parsedUrl.hostname,
+                    path: parsedUrl.pathname + parsedUrl.search,
+                    method: method,
+                    timeout: 10000,
+                    headers: {
+                        'User-Agent': 'OCMUI-Team-Dashboard/1.0 (Link Checker; +https://github.com/RedHatInsights/uhc-portal)'
+                    }
+                };
+                
+                const req = httpModule.request(options, (res) => {
+                    // For GET requests, consume the response body to properly close connection
+                    if (method === 'GET') {
+                        res.resume();
+                    }
+                    resolve({
+                        status: res.statusCode,
+                        headers: res.headers
+                    });
+                });
+                
+                req.on('error', (err) => {
+                    resolve({ error: err.message });
+                });
+                
+                req.on('timeout', () => {
+                    req.destroy();
+                    resolve({ error: 'Request timed out' });
+                });
+                
+                req.end();
+            } catch (err) {
+                resolve({ error: err.message });
+            }
+        });
+    };
+    
+    // Try HEAD first
+    let response = await makeRequest(url, 'HEAD');
+    
+    // If HEAD returns 405 (Method Not Allowed), fallback to GET
+    // This matches check-links.mjs fetchWithFallback() behavior
+    if (response.status === 405) {
+        response = await makeRequest(url, 'GET');
+    }
+    
+    // Handle errors
+    if (response.error) {
+        return {
+            url,
+            status: 'error',
+            category: 'request_error',
+            error: response.error
+        };
+    }
+    
+    const status = response.status;
+    let result = { url, status };
+    
+    // Categorize result
+    if (status >= 200 && status < 300) {
+        result.category = 'success';
+    } else if (status >= 300 && status < 400) {
+        result.category = 'redirect';
+        const location = response.headers.location;
+        if (location) {
+            try {
+                result.redirectUrl = new URL(location, url).toString();
+            } catch {
+                result.redirectUrl = location;
+            }
+        }
+    } else if (status >= 400 && status < 500) {
+        result.category = 'client_error';
+    } else if (status >= 500) {
+        result.category = 'server_error';
+    }
+    
+    return result;
+};
+
+// Test redirect destination with timeout
+const checkRedirectDestination = async (result, timeoutMs = 8000) => {
+    if (result.category !== 'redirect' || !result.redirectUrl) {
+        return result;
+    }
+    
+    try {
+        // Add a timeout to prevent hanging on slow redirects
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Redirect check timed out')), timeoutMs);
+        });
+        
+        const redirectResult = await Promise.race([
+            checkUrl(result.redirectUrl),
+            timeoutPromise
+        ]);
+        
+        result.redirectStatus = redirectResult.status;
+        if (redirectResult.category === 'request_error') {
+            result.redirectError = redirectResult.error;
+        }
+    } catch (err) {
+        result.redirectError = err.message;
+        result.redirectStatus = 'timeout';
+    }
+    
+    return result;
+};
+
+// Run full URL check with optional progress callback
+const runDocLinksCheck = async (onProgress = null) => {
+    console.log('🔍 Starting doc links health check...');
+    const startTime = Date.now();
+    
+    // Progress callback helper
+    const reportProgress = (stage, current, total, message) => {
+        if (onProgress) {
+            onProgress({ stage, current, total, message });
+        }
+    };
+    
+    reportProgress('fetching', 0, 0, 'Fetching URL list from uhc-portal...');
+    
+    const urls = await fetchDocLinkUrls();
+    if (urls.length === 0) {
+        throw new Error('No URLs found to check');
+    }
+    
+    console.log(`🔍 Checking ${urls.length} URLs...`);
+    reportProgress('checking', 0, urls.length, `Found ${urls.length} URLs to check`);
+    
+    // Check URLs in batches to avoid overwhelming servers
+    const batchSize = 20;
+    const results = [];
+    
+    for (let i = 0; i < urls.length; i += batchSize) {
+        const batch = urls.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(checkUrl));
+        results.push(...batchResults);
+        
+        const checked = Math.min(i + batchSize, urls.length);
+        const percent = Math.round((checked / urls.length) * 100);
+        reportProgress('checking', checked, urls.length, `Checking URLs: ${checked}/${urls.length} (${percent}%)`);
+        
+        // Small delay between batches
+        if (i + batchSize < urls.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+    
+    // Check redirect destinations (with timeout to prevent API freeze)
+    console.log('🔍 Checking redirect destinations...');
+    const redirects = results.filter(r => r.category === 'redirect');
+    reportProgress('redirects', 0, redirects.length, `Testing ${redirects.length} redirect destinations...`);
+    
+    // Process redirects in batches with individual timeouts
+    const redirectBatchSize = 10;
+    for (let i = 0; i < redirects.length; i += redirectBatchSize) {
+        const batch = redirects.slice(i, i + redirectBatchSize);
+        await Promise.all(batch.map(r => checkRedirectDestination(r, 8000)));
+        
+        const checked = Math.min(i + redirectBatchSize, redirects.length);
+        const percent = Math.round((checked / redirects.length) * 100);
+        reportProgress('redirects', checked, redirects.length, `Testing redirects: ${checked}/${redirects.length} (${percent}%)`);
+        
+        // Small delay between batches
+        if (i + redirectBatchSize < redirects.length) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
+    
+    // Calculate summary
+    const summary = {
+        total: results.length,
+        success: results.filter(r => r.category === 'success').length,
+        redirects: results.filter(r => r.category === 'redirect').length,
+        redirectErrors: results.filter(r => r.category === 'redirect' && r.redirectStatus && (r.redirectStatus < 200 || r.redirectStatus >= 300)).length,
+        clientErrors: results.filter(r => r.category === 'client_error').length,
+        serverErrors: results.filter(r => r.category === 'server_error').length,
+        requestErrors: results.filter(r => r.category === 'request_error').length,
+        skipped: results.filter(r => r.category === 'skipped').length
+    };
+    
+    // Sort results: errors first, then redirects, then success
+    results.sort((a, b) => {
+        const categoryOrder = {
+            'client_error': 0,
+            'server_error': 1,
+            'request_error': 2,
+            'redirect': 3,
+            'success': 4,
+            'skipped': 5
+        };
+        const orderA = categoryOrder[a.category] ?? 99;
+        const orderB = categoryOrder[b.category] ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.url.localeCompare(b.url);
+    });
+    
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ Doc links check completed in ${duration}s: ${summary.total} URLs, ${summary.clientErrors + summary.serverErrors + summary.requestErrors} errors`);
+    
+    return { results, summary };
+};
+
+// Doc links status endpoint
+app.get('/api/doc-links/status', async (req, res) => {
+    const hasCache = !!(docLinksCache.results && docLinksCache.lastChecked);
+    const cacheAge = hasCache ? Date.now() - new Date(docLinksCache.lastChecked).getTime() : null;
+    
+    res.json({
+        hasCachedResults: hasCache,
+        lastChecked: docLinksCache.lastChecked,
+        cacheAgeMs: cacheAge,
+        urlCount: docLinksCache.urlList?.length || 0,
+        sources: {
+            installLinks: DOC_LINKS_INSTALL_URL,
+            supportLinks: DOC_LINKS_SUPPORT_URL
+        }
+    });
+});
+
+// Server-Sent Events endpoint for doc links with progress updates
+app.get('/api/doc-links/stream', async (req, res) => {
+    const forceRefresh = req.query.refresh === 'true';
+    const now = Date.now();
+    
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    
+    // Helper to send SSE events
+    const sendEvent = (event, data) => {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+    
+    // Check cache first (unless forcing refresh)
+    if (!forceRefresh && docLinksCache.results && docLinksCache.lastChecked) {
+        const cacheAge = now - new Date(docLinksCache.lastChecked).getTime();
+        if (cacheAge < DOC_LINKS_CACHE_TTL) {
+            console.log(`📦 SSE: Returning cached doc links results (age: ${Math.round(cacheAge/1000)}s)`);
+            sendEvent('complete', {
+                success: true,
+                results: docLinksCache.results,
+                summary: docLinksCache.summary,
+                lastChecked: docLinksCache.lastChecked,
+                source: 'cache'
+            });
+            res.end();
+            return;
+        }
+    }
+    
+    try {
+        // Progress callback for SSE updates
+        const onProgress = (progress) => {
+            sendEvent('progress', progress);
+        };
+        
+        const { results, summary } = await runDocLinksCheck(onProgress);
+        
+        // Update cache
+        docLinksCache.results = results;
+        docLinksCache.summary = summary;
+        docLinksCache.lastChecked = new Date().toISOString();
+        
+        sendEvent('complete', {
+            success: true,
+            results,
+            summary,
+            lastChecked: docLinksCache.lastChecked,
+            source: 'fresh'
+        });
+    } catch (err) {
+        console.error('Doc links SSE check error:', err);
+        
+        if (docLinksCache.results) {
+            sendEvent('complete', {
+                success: true,
+                results: docLinksCache.results,
+                summary: docLinksCache.summary,
+                lastChecked: docLinksCache.lastChecked,
+                source: 'stale_cache',
+                warning: `Check failed: ${err.message}. Showing cached results.`
+            });
+        } else {
+            sendEvent('error', {
+                success: false,
+                error: err.message || 'Failed to check doc links'
+            });
+        }
+    }
+    
+    res.end();
+});
+
+// Main doc links endpoint - returns cached results or runs check
+app.get('/api/doc-links', async (req, res) => {
+    const forceRefresh = req.query.refresh === 'true';
+    const now = Date.now();
+    
+    // Return cached results if valid and not forcing refresh
+    if (!forceRefresh && docLinksCache.results && docLinksCache.lastChecked) {
+        const cacheAge = now - new Date(docLinksCache.lastChecked).getTime();
+        if (cacheAge < DOC_LINKS_CACHE_TTL) {
+            console.log(`📦 Returning cached doc links results (age: ${Math.round(cacheAge/1000)}s)`);
+            return res.json({
+                success: true,
+                results: docLinksCache.results,
+                summary: docLinksCache.summary,
+                lastChecked: docLinksCache.lastChecked,
+                source: 'cache'
+            });
+        }
+    }
+    
+    try {
+        const { results, summary } = await runDocLinksCheck();
+        
+        // Update cache
+        docLinksCache.results = results;
+        docLinksCache.summary = summary;
+        docLinksCache.lastChecked = new Date().toISOString();
+        
+        res.json({
+            success: true,
+            results,
+            summary,
+            lastChecked: docLinksCache.lastChecked,
+            source: 'fresh'
+        });
+    } catch (err) {
+        console.error('Doc links check error:', err);
+        
+        // If we have stale cache, return it with a warning
+        if (docLinksCache.results) {
+            return res.json({
+                success: true,
+                results: docLinksCache.results,
+                summary: docLinksCache.summary,
+                lastChecked: docLinksCache.lastChecked,
+                source: 'stale_cache',
+                warning: `Check failed: ${err.message}. Showing cached results.`
+            });
+        }
+        
+        res.status(500).json({
+            success: false,
+            error: err.message || 'Failed to check doc links'
+        });
+    }
+});
+
 // Serve React app for all other routes (SPA routing support)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../dist/index.html'));

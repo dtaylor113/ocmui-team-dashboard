@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 
 interface FeatureFlag {
   name: string;
+  inCode: boolean;
   staging: 'ON' | 'OFF' | '-';
   production: 'ON' | 'OFF' | '-';
   mismatch: boolean;
@@ -284,16 +285,17 @@ const FeatureFlagsPanel: React.FC = () => {
           <thead>
             <tr>
               <th className="ff-th-name">Flag Name</th>
+              <th className="ff-th-incode">In Code?</th>
               <th className="ff-th-env">Stage</th>
               <th className="ff-th-env">Prod</th>
               <th className="ff-th-strategy">Strategy</th>
-              <th className="ff-th-status">Status / Last Modified</th>
+              <th className="ff-th-status">Status / Last Modified (Prod)</th>
             </tr>
           </thead>
           <tbody>
             {filteredFlags.length === 0 ? (
               <tr>
-                <td colSpan={5} className="ff-empty">
+                <td colSpan={6} className="ff-empty">
                   No flags match your search criteria
                 </td>
               </tr>
@@ -305,6 +307,11 @@ const FeatureFlagsPanel: React.FC = () => {
                 >
                   <td className="ff-cell-name">
                     <span className="ff-flag-name">{flag.name}</span>
+                  </td>
+                  <td className="ff-cell-incode">
+                    <span className={`ff-incode-badge ${flag.inCode ? 'ff-incode-yes' : 'ff-incode-no'}`}>
+                      {flag.inCode ? '✓' : '✗'}
+                    </span>
                   </td>
                   <td className="ff-cell-env">
                     <span className={`ff-env-badge ff-env-${flag.staging.toLowerCase()}`}>

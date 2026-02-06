@@ -21,12 +21,14 @@ Before making changes, please read these files in order:
 - View your own PRs with status badges
 - JIRA lookup with hierarchy visualization
 - Feature Flags comparison (Unleash staging vs production)
+- Doc Links health checker (real-time URL validation from uhc-portal)
 - Team Timeboard with timezone support
 - Reviewer comment notifications with badges
 
 **Navigation**: Two-level inline grouped tabs
 - Primary: JIRA │ GitHub │ Other (category selectors)
 - Secondary: Subtabs appear inline when primary is active
+- Other tab includes: Feature Flags, Doc Links
 
 **Live URL**: `https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com`
 
@@ -65,6 +67,7 @@ src/
 │   ├── JiraCard.tsx    # Individual JIRA card
 │   ├── PRCard.tsx      # Individual PR card
 │   ├── FeatureFlagsPanel.tsx  # Unleash comparison
+│   ├── DocLinksPanel.tsx      # Doc Links health checker
 │   ├── TimeboardModal.tsx     # Team timezone dashboard
 │   ├── SettingsModal.tsx      # Settings + App Security
 │   └── FirstRunIdentityModal.tsx  # "Who are you?" flow
@@ -79,7 +82,7 @@ src/
     └── settings.ts          # TypeScript interfaces
 
 server/
-└── index.js            # Express server (ES Modules)
+└── index.js            # Express server (ES Modules, GitHub/JIRA/Unleash/DocLinks proxies)
 
 openshift/
 ├── deployment.yaml     # Kubernetes Deployment
@@ -189,6 +192,7 @@ export const useMyData = () => {
 // In App.tsx secondaryTabConfig
 other: [
   { id: 'feature-flags', label: 'Feature Flags', icon: unleashIcon },
+  { id: 'doc-links', label: 'Doc Links', icon: chainIcon },  // Existing
   { id: 'sprint-report', label: 'Sprint Report' }  // New tab
 ]
 ```

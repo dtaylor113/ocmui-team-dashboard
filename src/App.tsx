@@ -11,7 +11,7 @@ import unleashIcon from './assets/unleash.png';
 import './styles/App.css';
 
 // Tab types for the application
-export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'jira-lookup' | 'feature-flags';
+export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'jira-lookup' | 'feature-flags' | 'doc-links';
 export type PrimaryTabType = 'jira' | 'github' | 'other';
 
 interface AppState {
@@ -23,6 +23,9 @@ const TAB_STORAGE_KEY = 'ocmui_current_tab';
 
 // Generic "more" icon for Other tab (inline SVG as data URI)
 const moreIcon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239ca3af'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/svg%3E";
+
+// Link/chain icon for Doc Links tab (scaled down with padding to match other icons)
+const linkIcon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(4,4) scale(1)'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'/%3E%3C/g%3E%3C/svg%3E";
 
 // Primary tab configuration
 const primaryTabConfig = [
@@ -42,7 +45,8 @@ const secondaryTabConfig: Record<PrimaryTabType, Array<{ id: TabType; label: str
     { id: 'my-prs', label: 'My PRs' }
   ],
   other: [
-    { id: 'feature-flags', label: 'Feature Flags', icon: unleashIcon }
+    { id: 'feature-flags', label: 'Feature Flags', icon: unleashIcon },
+    { id: 'doc-links', label: 'Doc Links', icon: linkIcon }
   ]
 };
 

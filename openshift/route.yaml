@@ -4,6 +4,9 @@ metadata:
   name: ocmui-team-dashboard
   labels:
     app: ocmui-team-dashboard
+  annotations:
+    # Increase timeout for long-running requests like Doc Links check (~90s)
+    haproxy.router.openshift.io/timeout: 180s
 spec:
   # The hostname will be auto-generated if not specified
   # Uncomment and customize if you want a specific hostname:

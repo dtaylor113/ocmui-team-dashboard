@@ -7,6 +7,7 @@ import EmptyState from './EmptyState';
 import JiraLookupPanel from './JiraLookupPanel';
 import AssociatedJirasPanel from './AssociatedJirasPanel';
 import FeatureFlagsPanel from './FeatureFlagsPanel';
+import DocLinksPanel from './DocLinksPanel';
 
 interface SplitPanelProps {
   currentTab: TabType;
@@ -47,8 +48,8 @@ const SplitPanel: React.FC<SplitPanelProps> = ({ currentTab }) => {
       setSelectedPR(undefined);
       setSelectedTicket(undefined); // Clear JIRA ticket selection to prevent stale Associated PRs
       setInvalidJiraIds([]); // Clear invalid JIRA IDs when switching tabs
-    } else if (currentTab === 'feature-flags') {
-      // Feature flags tab - clear all selections
+    } else if (currentTab === 'feature-flags' || currentTab === 'doc-links') {
+      // Feature flags and Doc Links tabs - clear all selections
       setSelectedPR(undefined);
       setSelectedTicket(undefined);
       setInvalidJiraIds([]);
@@ -123,6 +124,15 @@ const SplitPanel: React.FC<SplitPanelProps> = ({ currentTab }) => {
     return (
       <div className="full-panel">
         <FeatureFlagsPanel />
+      </div>
+    );
+  }
+
+  // Doc Links tab renders as full-width panel (no split)
+  if (currentTab === 'doc-links') {
+    return (
+      <div className="full-panel">
+        <DocLinksPanel />
       </div>
     );
   }

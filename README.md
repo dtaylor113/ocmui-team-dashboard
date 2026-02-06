@@ -5,8 +5,9 @@
 
 ## ✨ Features
 
-- **🔗 GitHub Integration**: Track PRs, code reviews, and repository activity  
+- **🔗 GitHub Integration**: Track PRs, code reviews, and repository activity
 - **📋 JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
+- **🩺 Doc Links Health Checker**: Real-time validation of uhc-portal documentation URLs
 - **Jira Hierarchy View**: Click any JIRA card to see a popup containing a hierarchy tree of all of it's parents.
 <img src="src/assets/JiraHierarchyPopup.png" alt="JIRA Hierarchy Popup" width="600">
 - **🌐 Unified Dashboard**: Single interface combining both platforms with auto-associations
@@ -32,7 +33,7 @@ The header uses an **inline grouped navigation** with primary categories and the
 |-------------|----------------|-------------|
 | **🎫 JIRA** | My Sprint JIRAs, JIRA Lookup | JIRA ticket management |
 | **🐙 GitHub** | My Code Reviews, My PRs | GitHub PR tracking |
-| **••• Other** | 🚩 Feature Flags | Unleash feature flags dashboard |
+| **••• Other** | 🚩 Feature Flags, 🔗 Doc Links | Unleash feature flags, URL health checker |
 
 - Click a **primary tab** to switch categories and reveal its subtabs
 - Click a **secondary tab** to switch views within that category
@@ -47,7 +48,8 @@ The header uses an **inline grouped navigation** with primary categories and the
   - Reference Time input with 30‑minute steps (09:00–17:00) and TZ dropdown sortable alphabetically or by GMT offset
 - **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled "(edited)"
 - **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
-- **Feature Flags Dashboard**: Compare Unleash feature flags between staging and production environments
+- **Feature Flags Dashboard**: Compare Unleash feature flags between staging and production; "In Code?" column; production modification history
+- **Doc Links Health Checker**: Validates 425 external documentation URLs from uhc-portal with real-time checks
 - **App Security Info**: Click "ⓘ App Security" in Settings to see how your data is protected
 
 ## 🚀 Quick Start

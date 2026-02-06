@@ -62,6 +62,10 @@ server/index.js (ESM)
 # Unleash Proxy Endpoints (use UNLEASH_STAGING_TOKEN, UNLEASH_PROD_TOKEN env vars)
 - GET  /api/unleash/status                                   # Check if Unleash tokens are configured
 - POST /api/unleash/flags                                    # Fetch and compare feature flags from staging/prod
+
+# Doc Links Endpoints (uses GITHUB_TOKEN to fetch source files)
+- GET  /api/doc-links/check                                  # Fetch URLs from uhc-portal, validate, return results
+- GET  /api/doc-links/urls                                   # Return extracted URL list (for debugging)
 ```
 
 The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. 
@@ -96,7 +100,7 @@ Users only need to provide their **username** (GitHub) and **email** (JIRA) to f
   |---------|----------------|
   | JIRA | My Sprint JIRAs, JIRA Lookup |
   | GitHub | My Code Reviews, My PRs |
-  | Other | 🚩 Feature Flags |
+  | Other | 🚩 Feature Flags, 🔗 Doc Links |
 - Team Timeboard: Globe button opens team timezone dashboard
 
 ### Core Panels
@@ -105,7 +109,8 @@ Users only need to provide their **username** (GitHub) and **email** (JIRA) to f
 - **My Code Reviews**: PRs requesting your review; reviewer comments modal; refresh button
 - **My PRs**: Open/closed toggle, associated JIRA detection, status badges; refresh button
 - **Associated Panels (Right Side)**: Linked PRs for a JIRA; linked JIRAs for a PR
-- **Feature Flags**: Unleash dashboard comparing staging vs production; summary cards; search/filter; expandable descriptions
+- **Feature Flags**: Unleash dashboard comparing staging vs production; summary cards; search/filter; "In Code?" column shows if flag is defined in codebase; last modified info from production environment
+- **Doc Links**: Real-time URL health checker for uhc-portal documentation links; categorized results (success/redirect/client error/server error)
 
 ### Advanced Components
 - **JiraCard**: Atlassian Document Format rendering; inline images; collapsible sections; status (filled Atlassian colors), type & priority (black with colored borders and icons); Comments title with superscript new/edited badge; comments sorted by recent activity and labeled “(edited)” when applicable
@@ -240,6 +245,79 @@ GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
 - **GitHub Images**: Inline when accessible; graceful fallback to styled links when blocked/expired
 - **No persistent caching by default**: The server exposes optional cache endpoints, but the frontend does not use them. Images are primarily proxied.
 - **Single-server Mode**: Same-origin serving improves reliability and performance
+
+---
+
+## 🔗 Doc Links Health Checker
+
+The Doc Links feature performs real-time validation of external documentation URLs from the [uhc-portal](https://github.com/RedHatInsights/uhc-portal) repository. It mirrors the behavior of the `check-links.mjs` GitHub Action workflow.
+
+### How It Works
+
+1. **Source Files**: The server fetches raw `.mjs` files from uhc-portal via GitHub API:
+   - `src/common/installLinks.mjs` - Installation documentation URLs
+   - `src/common/supportLinks.mjs` - Support/KB article URLs
+   - `src/common/docLinks.mjs` - General documentation URLs (when available)
+   - Configurable via `DOC_LINKS_SOURCE_FILES` environment variable
+
+2. **Regex-Based URL Extraction Strategy**:
+   The server parses JavaScript source files to extract URLs using a multi-step approach:
+
+   **Step 1: Filter Comments**
+   - Remove single-line comments (`// ...`)
+   - Remove multi-line comments (`/* ... */`)
+   - Prevents extraction of commented-out URLs
+
+   **Step 2: Extract Base URL Constants**
+   - Pattern: `const NAME = 'https://...'` or `const NAME = "https://..."`
+   - Builds a lookup table of constant names to URL values
+   - Example: `const docsBase = 'https://docs.redhat.com'`
+
+   **Step 3: Extract URLs with Template Literal Substitution**
+   - Matches URLs in quotes or backticks
+   - Substitutes `${NAME}` references with extracted constants
+   - Example: `` `${docsBase}/en-us/documentation` `` → `https://docs.redhat.com/en-us/documentation`
+
+   **Step 4: Filter Non-Link URLs**
+   - Excludes base URLs not intended as direct links (e.g., ending in `/html`, `/latest`, `/en-us`)
+   - Excludes malformed URLs containing control characters
+   - Excludes internal paths and non-http(s) URLs
+
+3. **URL Validation**:
+   - Uses HTTP HEAD request first (faster, less bandwidth)
+   - Falls back to GET request if HEAD returns 405 (Method Not Allowed)
+   - 8-second timeout per request to prevent freezes
+   - Batch processing with delays between batches
+
+4. **Redirect Handling**:
+   - Captures redirect destination for 3xx responses
+   - Validates redirect target with same HEAD/GET fallback logic
+   - Reports `redirectError` if target check fails
+
+### Server Endpoints
+
+- `GET /api/doc-links/check` - Full health check (fetches, parses, validates all URLs)
+- `GET /api/doc-links/urls` - Returns just the extracted URL list (for debugging)
+
+### Result Categories
+
+| Category | HTTP Status | Description |
+|----------|-------------|-------------|
+| Success | 2xx | URL is accessible |
+| Redirects | 3xx | URL redirects (destination validated) |
+| Client Errors | 4xx | Broken link (404, 403, etc.) |
+| Server Errors | 5xx | Target server issue |
+
+### Comparison with check-links.mjs
+
+The dashboard implementation closely matches the `check-links.mjs` GitHub Action:
+- ~421 URLs extracted (vs 425 from check-links.mjs)
+- Same broken links detected
+- Same HEAD→GET fallback behavior
+
+Minor differences in URL count are due to:
+- Dynamic JavaScript evaluation in check-links.mjs vs static regex parsing
+- Template literal edge cases
 
 ---
 

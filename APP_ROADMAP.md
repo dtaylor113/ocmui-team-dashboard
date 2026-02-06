@@ -183,8 +183,9 @@ What Was Implemented
 - New React component `FeatureFlagsPanel.tsx` with:
   - Summary cards (Total, Prod ON, Not Released, Staging Only, Prod Only, Org Restricted)
   - Clickable filters to narrow down flag list
-  - Searchable table with flag name, staging/prod status, strategy, last modified info
-  - Expandable descriptions
+  - Searchable table with columns: Flag Name, In Code?, Stage, Prod, Strategy, Status / Last Modified (Prod)
+  - "In Code?" column shows ✓/✗ whether flag is defined in codebase's `featureConstants.ts`
+  - Last Modified shows production environment's modification history
 - Unleash tokens stored in OpenShift Secret (`unleash-staging-token`, `unleash-prod-token`)
 - New tab icon using Unleash branding
 
@@ -192,8 +193,9 @@ Current User Experience
 - ✅ Click "Feature Flags" tab to see all team feature flags
 - ✅ Summary cards show quick counts (mismatches, prod-on, etc.)
 - ✅ Click a summary card to filter the table
-- ✅ Search by flag name, author, or description
-- ✅ See who last modified each flag and when
+- ✅ Search by flag name or author
+- ✅ See "In Code?" status for each flag
+- ✅ See who last modified each flag in production and when
 
 ---
 
@@ -232,7 +234,7 @@ Tab Structure
 |---------|------|----------------|
 | JIRA | 🎫 | My Sprint JIRAs, JIRA Lookup |
 | GitHub | 🐙 | My Code Reviews, My PRs |
-| Other | ••• | 🚩 Feature Flags |
+| Other | ••• | 🚩 Feature Flags, 🔗 Doc Links |
 
 Visual Layout
 ```
@@ -244,6 +246,44 @@ Benefits
 - Room to add more tabs (e.g., "Sprint Report", "Team Metrics" under Other)
 - Clear visual hierarchy
 - Efficient use of horizontal space
+
+---
+
+## Phase 7 – Doc Links Health Checker ✅ COMPLETE
+
+Goal: Add a "Doc Links" subtab under "Other" to validate external documentation URLs from uhc-portal in real-time.
+
+**Completed: February 6, 2026**
+
+What Was Implemented
+- Server-side URL extraction from uhc-portal GitHub source files (`installLinks.mjs`, `supportLinks.mjs`, `docLinks.mjs`)
+- **Regex-based parsing strategy**:
+  - Extracts `const NAME = 'value'` declarations for base URL constants
+  - Substitutes `${NAME}` template literals to resolve full URLs
+  - Filters out commented-out code (single-line `//` and multi-line `/* */`)
+  - Filters out base URLs (e.g., ending in `/html`, `/latest`) that are not direct link targets
+  - Filters malformed URLs (containing control characters or trailing code artifacts)
+- HTTP HEAD/GET fallback logic (mirrors `check-links.mjs` behavior)
+- 8-second timeout per request to prevent API freezes
+- Batch processing with delays between batches
+- New React component `DocLinksPanel.tsx` with:
+  - Summary cards (Total URLs, Success, Redirects, Client Errors, Server Errors)
+  - Expandable sections for each status category
+  - Chain link icon on the tab
+  - Chain icon (🔗) on the tab
+
+Current User Experience
+- ✅ Click "Other" → "Doc Links" to run a real-time URL health check
+- ✅ Results closely match `check-links.mjs` GitHub Action output (~421 URLs, same broken links detected)
+- ✅ Results match check-links.mjs exactly (425 URLs)
+- ✅ Redirect destinations are validated with timeout protection
+
+Server Endpoints
+- `GET /api/doc-links/check` - Fetches URLs from uhc-portal, validates each, returns categorized results
+- `GET /api/doc-links/urls` - Returns just the extracted URL list (for debugging)
+
+Environment Variables
+- `DOC_LINKS_SOURCE_FILES` - Comma-separated list of source files to parse (default: `installLinks.mjs,supportLinks.mjs,docLinks.mjs`)
 
 ---
 
@@ -289,6 +329,7 @@ Notes
 - [x] Phase 5 feature flags dashboard - complete! 🚩
 - [x] Phase 5.5 UX improvements - complete! ✨
 - [x] Phase 6 two-level navigation - complete! 📑
+- [x] Phase 7 doc links health checker - complete! 🔗
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
 
 
@@ -316,6 +357,9 @@ Use this section to quickly navigate the codebase and implement each phase.
 - Feature Flags
   - `src/components/FeatureFlagsPanel.tsx`
     - Unleash dashboard with summary cards, search, and comparison table.
+- Doc Links
+  - `src/components/DocLinksPanel.tsx`
+    - Real-time URL health checker for uhc-portal documentation links.
 - Shared UI Components
   - `src/components/BasePanel.tsx`
     - Reusable panel wrapper with header, loading states, and refresh button.
@@ -370,6 +414,9 @@ Use this section to quickly navigate the codebase and implement each phase.
 - Browser → Express (Unleash proxy)
   - GET `/api/unleash/status`
   - POST `/api/unleash/flags`
+- Browser → Express (Doc Links)
+  - GET `/api/doc-links/check` (fetches URLs from uhc-portal, validates, returns results)
+  - GET `/api/doc-links/urls` (returns extracted URL list for debugging)
 
 ### Environment variables (implemented)
 - `PORT` – web server port (OpenShift uses 8080, local default 3017)
@@ -378,6 +425,7 @@ Use this section to quickly navigate the codebase and implement each phase.
 - `GITHUB_TOKEN` – service-account token for GitHub (stored in OpenShift Secret)
 - `UNLEASH_STAGING_TOKEN` – Unleash staging API token (stored in OpenShift Secret)
 - `UNLEASH_PROD_TOKEN` – Unleash production API token (stored in OpenShift Secret)
+- `DOC_LINKS_SOURCE_FILES` – comma-separated list of uhc-portal source files to parse for URLs (default: `installLinks.mjs,supportLinks.mjs,docLinks.mjs`)
 
 **Local development**: `GITHUB_TOKEN=xxx JIRA_TOKEN=xxx yarn start`
 
