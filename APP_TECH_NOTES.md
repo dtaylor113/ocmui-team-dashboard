@@ -41,18 +41,39 @@ ocmui-team-dashboard/
 
 ```
 server/index.js (ESM)
-- /api/test-jira            # JIRA token validation
-- /api/jira-ticket          # Single JIRA ticket lookup
-- /api/jira-sprint-tickets  # Sprint JIRAs for user
-- /api/jira-child-issues    # Child issues for Epic/Feature/parent (JQL-based)
+
+# JIRA Endpoints (use JIRA_TOKEN env var)
+- GET  /api/jira/status        # Check if JIRA service account is configured
+- POST /api/test-jira          # JIRA token validation (legacy, uses server token)
+- POST /api/jira-ticket        # Single JIRA ticket lookup
+- POST /api/jira-sprint-tickets # Sprint JIRAs for user
+- POST /api/jira-child-issues  # Child issues for Epic/Feature/parent (JQL-based)
+
+# GitHub Proxy Endpoints (use GITHUB_TOKEN env var)
+- GET  /api/github/status                                    # Check if GitHub service account is configured
+- GET  /api/github/search/issues                             # Search PRs/issues
+- GET  /api/github/repos/:owner/:repo/pulls/:number          # PR details
+- GET  /api/github/repos/:owner/:repo/pulls/:number/reviews  # PR reviews
+- GET  /api/github/repos/:owner/:repo/pulls/:number/comments # PR inline comments
+- GET  /api/github/repos/:owner/:repo/pulls/:number/requested_reviewers
+- GET  /api/github/repos/:owner/:repo/issues/:number/comments
+- GET  /api/github/repos/:owner/:repo/commits/:ref/status    # CI status
 ```
 
-The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. It also acts as a JIRA proxy to bypass CORS restrictions in browser environments. The `/api/jira-ticket` endpoint includes each comment’s `updated` timestamp (when present) so the UI can detect edited comments.
+The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. 
 
-#### Why a Backend Server Is Required for JIRA (But Not GitHub)
+#### Server-Side Tokens (Phase 3 - Current)
+
+Both GitHub and JIRA tokens are now provided by the server via environment variables:
+- `GITHUB_TOKEN` - GitHub personal access token (service account)
+- `JIRA_TOKEN` - JIRA personal access token (service account)
+
+Users only need to provide their **username** (GitHub) and **email** (JIRA) to filter results for themselves.
+
+#### Why a Backend Server Is Required
 
 - **JIRA** (enterprise instance): No CORS support for browser-origin requests; requires server-side proxy
-- **GitHub**: CORS-friendly public API; tokens work directly from the frontend
+- **GitHub**: Now also proxied to enable server-side token management (users don't need their own tokens)
 
 ---
 
@@ -98,35 +119,56 @@ yarn install
 
 2) Start application
 
-- Production-like build and serve (Recommended)
+**Option A: Local Development with Service Account Tokens (Recommended)**
+
+```bash
+# Set tokens as environment variables (get from team lead or create your own)
+GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start
+```
+- This matches the hosted behavior - users only need their username, not tokens
+- Builds React and serves from Express on `http://localhost:3017`
+
+**Option B: Local Development without Tokens**
+
 ```bash
 yarn start
 ```
-  - Builds React and serves from Express on `http://localhost:3017`
-  - Same-origin for optimal image handling and security
+- GitHub and JIRA features will show "service not configured" errors
+- Useful for UI-only development
 
-- Development mode (hot reloading)
+**Option C: Development mode (hot reloading)**
+
 ```bash
-yarn start:dev
+GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
 ```
-  - API server: `http://localhost:3017` (Express)
-  - React app: `http://localhost:5174` (Vite dev server)
+- API server: `http://localhost:3017` (Express)
+- React app: `http://localhost:5174` (Vite dev server)
 
-3) Configure tokens
+3) Configure your identity
 - Open Settings (gear icon)
-- Add GitHub token
-- Add JIRA token and email
+- Verify GitHub and JIRA connections show ✅
+- Enter your GitHub username and JIRA email
 - Settings persist in localStorage
+
+> **Note**: Users no longer need their own API tokens! The server provides them via environment variables.
 
 ---
 
 ## 🔧 Technical Architecture
 
 ### State Management
-- **React Context**: Settings, tokens, user preferences (timezone)
+- **React Context**: Settings, user identity, user preferences (timezone)
 - **React Query**: Server state with caching and background updates
-- **LocalStorage**: Token persistence, search history, timezone preferences, team selection
+- **LocalStorage**: User identity, search history, timezone preferences, team selection
 - **Component State**: UI state and forms
+
+### Identity & Session Management
+- **First-run flow**: "Who are you?" modal appears on first visit
+- **Identity persistence**: Selected team member stored in `localStorage`
+- **Log Out**: Settings modal includes "🚪 Log Out" button that:
+  - Clears all localStorage data (tokens, preferences, identity)
+  - Reloads page to trigger first-run flow
+  - Useful for testing or switching users
 
 ### API Integration
 - **GitHub API**: Direct from frontend; multi-endpoint integration; robust error handling
@@ -233,15 +275,31 @@ Development notes:
 
 ## 🧪 Scripts (Yarn)
 ```bash
-yarn start       # Build + serve from Express (recommended default)
+# Recommended: Run with service account tokens
+GITHUB_TOKEN=ghp_xxx JIRA_TOKEN=xxx yarn start
+
+# Available scripts
+yarn start       # Build + serve from Express (add env vars for full functionality)
 yarn start:dev   # Express API + Vite dev server (hot reload)
-Note: The Express server does not auto-restart on changes. Restart manually or use a watcher like nodemon (e.g., add a `start:api:watch` script).
 yarn build       # Production build
 yarn dev         # Vite dev server only
 yarn start:api   # API server only (no frontend)
 yarn lint        # ESLint
 yarn preview     # Preview production build
+
+# Note: The Express server does not auto-restart on changes. 
+# Restart manually or use a watcher like nodemon.
 ```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITHUB_TOKEN` | Yes* | GitHub personal access token (service account) |
+| `JIRA_TOKEN` | Yes* | JIRA personal access token (service account) |
+| `PORT` | No | Server port (default: 3017 locally, 8080 in container) |
+
+*Required for full functionality. Without tokens, GitHub/JIRA features will show "service not configured" errors.
 
 ---
 

@@ -26,19 +26,17 @@ spec:
           env:
             - name: PORT
               value: "8080"
-            # Phase 3: Uncomment these when moving tokens to server-side
-            # - name: GITHUB_TOKEN
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: ocmui-dashboard-tokens
-            #       key: github-token
-            # - name: JIRA_TOKEN
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: ocmui-dashboard-tokens
-            #       key: jira-token
-            # - name: JIRA_BASE_URL
-            #   value: "https://issues.redhat.com"
+            # Phase 3: Server-side tokens (users don't need their own)
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ocmui-dashboard-tokens
+                  key: github-token
+            - name: JIRA_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ocmui-dashboard-tokens
+                  key: jira-token
           resources:
             requests:
               memory: "128Mi"

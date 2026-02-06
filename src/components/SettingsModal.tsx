@@ -11,7 +11,8 @@ const SettingsModal: React.FC = () => {
     closeSettingsModal, 
     saveSettings, 
     testGithubToken, 
-    testJiraToken 
+    testJiraToken,
+    resetIdentity
   } = useSettings();
   
   const [formData, setFormData] = useState<ApiTokens>(apiTokens);
@@ -115,40 +116,35 @@ const SettingsModal: React.FC = () => {
         </div>
         
         <div className="modal-body">
-          {/* GitHub Token */}
+          {/* GitHub Service Account Status */}
           <div className="form-group">
-            <label htmlFor="github-token">GitHub Token:</label>
+            <label>GitHub Connection:</label>
             <div className="input-row">
-              <input
-                id="github-token"
-                type="password"
-                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                value={formData.github}
-                onChange={(e) => handleInputChange('github', e.target.value)}
-              />
+              <div className="service-account-info">
+                {testStates.github.result 
+                  ? (testStates.github.result.success 
+                      ? `✅ ${testStates.github.result.message}` 
+                      : `❌ ${testStates.github.result.message}`)
+                  : '🔗 GitHub access provided by server (no personal token needed)'}
+              </div>
               <button 
                 className={`test-btn ${testStates.github.result ? (testStates.github.result.success ? 'test-success' : 'test-failure') : ''}`}
                 onClick={handleTestGithub}
                 disabled={testStates.github.testing}
               >
                 {testStates.github.testing 
-                  ? 'Testing...' 
-                  : testStates.github.result 
-                    ? testStates.github.result.message 
-                    : 'Test'}
+                  ? 'Checking...' 
+                  : 'Check Status'}
               </button>
             </div>
             <div className="help-text">
-              <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
-                Create GitHub Token →
-              </a>
-              <small>Required scopes: public_repo, repo:status, read:user</small>
+              <small>GitHub API access is handled by the server - you only need to provide your username below</small>
             </div>
           </div>
 
           {/* GitHub Username */}
           <div className="form-group">
-            <label htmlFor="github-username">GitHub Username:</label>
+            <label htmlFor="github-username">Your GitHub Username:</label>
             <input
               id="github-username"
               type="text"
@@ -157,43 +153,39 @@ const SettingsModal: React.FC = () => {
               onChange={(e) => handleInputChange('githubUsername', e.target.value)}
             />
             <div className="help-text">
-              <small>Used for "Awaiting My Code Review" and "My PRs" tabs</small>
+              <small>Your GitHub username - used to filter PRs and code reviews for you</small>
             </div>
           </div>
 
-          {/* JIRA Token */}
+          {/* JIRA Service Account Status */}
           <div className="form-group">
-            <label htmlFor="jira-token">JIRA Token:</label>
+            <label>JIRA Connection:</label>
             <div className="input-row">
-              <input
-                id="jira-token"
-                type="password"
-                placeholder="Your JIRA API token"
-                value={formData.jira}
-                onChange={(e) => handleInputChange('jira', e.target.value)}
-              />
+              <div className="service-account-info">
+                {testStates.jira.result 
+                  ? (testStates.jira.result.success 
+                      ? `✅ ${testStates.jira.result.message}` 
+                      : `❌ ${testStates.jira.result.message}`)
+                  : '🔗 JIRA access provided by server (no personal token needed)'}
+              </div>
               <button 
                 className={`test-btn ${testStates.jira.result ? (testStates.jira.result.success ? 'test-success' : 'test-failure') : ''}`}
                 onClick={handleTestJira}
                 disabled={testStates.jira.testing}
               >
                 {testStates.jira.testing 
-                  ? 'Testing...' 
-                  : testStates.jira.result 
-                    ? testStates.jira.result.message 
-                    : 'Test'}
+                  ? 'Checking...' 
+                  : 'Check Status'}
               </button>
             </div>
             <div className="help-text">
-              <a href="https://issues.redhat.com/secure/ViewProfile.jspa" target="_blank" rel="noopener noreferrer">
-                Create JIRA Token →
-              </a>
+              <small>JIRA API access is handled by the server - you only need to provide your email below</small>
             </div>
           </div>
 
-          {/* JIRA Username */}
+          {/* JIRA Username (Email) */}
           <div className="form-group">
-            <label htmlFor="jira-username">JIRA Username:</label>
+            <label htmlFor="jira-username">Your JIRA Email:</label>
             <input
               id="jira-username"
               type="email"
@@ -202,13 +194,24 @@ const SettingsModal: React.FC = () => {
               onChange={(e) => handleInputChange('jiraUsername', e.target.value)}
             />
             <div className="help-text">
-              <small>Your JIRA login email - used for "My Sprint JIRAs" to find tickets assigned to you</small>
+              <small>Your Red Hat email - used to find JIRA tickets assigned to you</small>
             </div>
           </div>
         </div>
 
         <div className="modal-footer">
           <div className="modal-footer-left">
+            <button 
+              className="btn btn-danger" 
+              onClick={() => {
+                if (window.confirm('This will clear your identity and settings. You will need to set up again. Continue?')) {
+                  resetIdentity();
+                }
+              }}
+              title="Clear all settings and restart the 'Who are you?' setup"
+            >
+              🚪 Log Out
+            </button>
             <a 
               className="btn btn-feedback" 
               href="https://redhat-internal.slack.com/app_redirect?channel=UA0LKKEMU" 
@@ -217,7 +220,7 @@ const SettingsModal: React.FC = () => {
               title="Open Slack web to DM dtaylor"
             >
               <img src={slackIcon} alt="Slack" className="btn-icon" />
-              Give feedback to dtaylor
+              Feedback
             </a>
           </div>
           <div className="modal-footer-right">

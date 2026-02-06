@@ -67,56 +67,61 @@ Visit `https://<route-url>` to access the dashboard.
 
 ---
 
-## Current Behavior (Phase 2)
+## Current Behavior (Server-Side Tokens) ✅
 
-In this phase, the app works the same as locally:
-- Users configure their own GitHub and JIRA tokens in Settings
-- Tokens are stored in the browser's localStorage
-- No server-side secrets are used
+The dashboard uses **server-side service accounts** for both GitHub and JIRA:
 
-This is suitable for:
-- Personal use
-- Team members who each have their own tokens
-- Testing the deployment before Phase 3
+- ✅ **Users don't need their own tokens** - just their username/email
+- ✅ Tokens stored securely in OpenShift Secrets
+- ✅ Server proxies all GitHub and JIRA API calls
+- ✅ Each user sees their own data (filtered by username/email)
+
+### User Experience
+
+When users visit the dashboard:
+1. First-run "Who are you?" modal asks them to identify themselves
+2. They confirm their GitHub username and JIRA email in Settings
+3. Done! No tokens needed.
+
+### How It Works
+
+| API | Token Source | User Provides |
+|-----|--------------|---------------|
+| GitHub | Server (`GITHUB_TOKEN` env var) | GitHub username |
+| JIRA | Server (`JIRA_TOKEN` env var) | JIRA email |
 
 ---
 
-## Phase 3: Server-Side Tokens (Future)
+## Managing Server-Side Tokens
 
-When Phase 3 is implemented, tokens will move to OpenShift Secrets:
-
-### Create the Secret
+### View Current Secret
 
 ```bash
-# Option 1: From command line
+oc get secret ocmui-dashboard-tokens -o yaml
+```
+
+### Update Tokens
+
+```bash
+# Delete and recreate the secret
+oc delete secret ocmui-dashboard-tokens
+
 oc create secret generic ocmui-dashboard-tokens \
   --from-literal=github-token='ghp_xxxxxxxxxxxxxxxxxxxx' \
   --from-literal=jira-token='your-jira-personal-access-token'
 
-# Option 2: From file (copy and edit secrets.example.yaml first)
-cp openshift/secrets.example.yaml openshift/secrets.yaml
-# Edit secrets.yaml with your tokens
-oc apply -f openshift/secrets.yaml
+# Restart deployment to pick up new tokens
+oc rollout restart deployment/ocmui-team-dashboard
 ```
 
-### Update Deployment
+### Verify Token Status
 
-Uncomment the environment variables in `openshift/deployment.yaml`:
+```bash
+# Check GitHub connection
+curl -s https://YOUR_ROUTE/api/github/status | jq .
 
-```yaml
-env:
-  - name: GITHUB_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: ocmui-dashboard-tokens
-        key: github-token
-  - name: JIRA_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: ocmui-dashboard-tokens
-        key: jira-token
-  - name: JIRA_BASE_URL
-    value: "https://issues.redhat.com"
+# Check JIRA connection  
+curl -s https://YOUR_ROUTE/api/jira/status | jq .
 ```
 
 ---
@@ -244,5 +249,5 @@ oc login <api-url> --username=cluster-admin --password=<generated-password>
 | `openshift/deployment.yaml` | Pod deployment configuration |
 | `openshift/service.yaml` | Internal ClusterIP service |
 | `openshift/route.yaml` | External HTTPS route |
-| `openshift/secrets.example.yaml` | Template for tokens (Phase 3) |
+| `openshift/secrets.example.yaml` | Template for tokens |
 | `openshift/kustomization.yaml` | Kustomize configuration |

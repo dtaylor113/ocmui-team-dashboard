@@ -3138,6 +3138,16 @@ html, body {
   flex: 1;
 }
 
+.service-account-info {
+  flex: 1;
+  padding: 12px 16px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
 .test-btn {
   background: #374151;
   border: 1px solid #4b5563;
@@ -3235,6 +3245,17 @@ html, body {
 .btn-secondary:hover {
   background: #4b5563;
   border-color: #6b7280;
+}
+
+.btn-danger {
+  background: #7f1d1d;
+  border-color: #991b1b;
+  color: #fca5a5;
+}
+
+.btn-danger:hover {
+  background: #991b1b;
+  border-color: #b91c1c;
 }
 
 .btn-primary {

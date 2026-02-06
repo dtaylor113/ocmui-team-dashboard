@@ -67,10 +67,12 @@ What Works
 - ✅ Full dashboard functionality (My Sprint JIRAs, My PRs, My Code Reviews, JIRA Lookup)
 - ✅ HTTPS via OpenShift Route with edge TLS termination
 
-Current Behavior
-- Users still provide their own GitHub and JIRA tokens
+Current Behavior (as of Phase 2.5)
+- Users provided their own GitHub and JIRA tokens
 - Tokens stored in browser localStorage
 - Identity (username) derived from roster selection
+
+**Note**: This phase has been superseded by Phase 3 - users no longer need tokens.
 
 Deployment Commands (for reference)
 ```bash
@@ -90,29 +92,37 @@ oc rollout restart deployment/ocmui-team-dashboard
 
 ---
 
-## Phase 3 – Hosted Variant (service-account tokens; OpenShift deploy)
+## Phase 3 – Server-Side Tokens ✅ COMPLETE
 
 Goal: Move tokens to OpenShift Secrets, proxy GitHub/JIRA via server, and deploy.
 
-Scope
-- Backend
-  - Read `GITHUB_TOKEN`, `JIRA_TOKEN`, `JIRA_BASE_URL` from env.
-  - Update JIRA endpoints to stop accepting `token` in requests; use env token.
-  - Add GitHub proxy endpoints for PR lists/details, reviews, issue comments, statuses, compare (with pagination where needed).
-  - Optional: `/api/github-image?url=...` proxy for private image rendering.
+**Completed: February 6, 2026**
+
+What Was Implemented
+- Backend (`server/index.js`)
+  - ✅ Read `GITHUB_TOKEN`, `JIRA_TOKEN`, `JIRA_BASE_URL` from environment
+  - ✅ GitHub proxy endpoints: `/api/github/status`, `/api/github/search/issues`, `/api/github/repos/:owner/:repo/pulls/:pull_number`, `/api/github/repos/:owner/:repo/pulls/:pull_number/reviews`, `/api/github/repos/:owner/:repo/pulls/:pull_number/comments`, `/api/github/repos/:owner/:repo/pulls/:pull_number/requested_reviewers`, `/api/github/repos/:owner/:repo/issues/:issue_number/comments`, `/api/github/repos/:owner/:repo/commits/:ref/status`, `/api/github/repos/:owner/:repo/commits/:ref/check-runs`
+  - ✅ JIRA endpoints use `process.env.JIRA_TOKEN` (no client token needed)
+  - ✅ `/api/jira/status` endpoint for checking server-side JIRA configuration
 - Frontend
-  - Switch GitHub fetches to call new server endpoints; remove token usage entirely.
-  - Remove token inputs from Settings once the server holds credentials.
+  - ✅ All GitHub fetches now use server proxy endpoints
+  - ✅ All JIRA fetches use server proxy (no token in request body)
+  - ✅ Token input fields removed from Settings modal
+  - ✅ Settings shows "GitHub/JIRA access provided by server"
+  - ✅ Added "Log Out" button to reset identity and re-test first-run flow
 - OpenShift
-  - Create Secret with tokens and base URL; apply Deployment/Service/Route.
-  - Health probes to `/`; log monitoring and basic rate-limit observability.
+  - ✅ Secret `ocmui-dashboard-tokens` with `github-token` and `jira-token`
+  - ✅ Deployment injects tokens via environment variables
 
-Acceptance
-- Hosted app functions without any user-pasted tokens; users select identity only.
-- Data visibility matches the service account’s access.
+Current User Experience
+- Users visit the hosted URL
+- First-run "Who are you?" modal appears
+- Select identity from team roster
+- Dashboard loads with full functionality - **no tokens needed!**
 
-Rollout
-- Can be implemented in this repo now that Phase 2.5 deployment is proven.
+Local Development
+- Run with tokens: `GITHUB_TOKEN=xxx JIRA_TOKEN=xxx yarn start`
+- See `README.md` for details
 
 ---
 
@@ -189,7 +199,7 @@ Notes
 - [x] Phase 1 complete and tagged
 - [x] Phase 2 manifests and Dockerfile ready
 - [x] Phase 2.5 Initial ROSA deployment live! 🎉
-- [ ] Phase 3 server-side tokens (no user tokens needed)
+- [x] Phase 3 server-side tokens - complete! 🔐
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
 - [ ] Phase 4 shared roster persistence
 
@@ -224,42 +234,50 @@ Use this section to quickly navigate the codebase and implement each phase.
 - Reviewer notifications keys (see `APP_TECH_NOTES.md`): `reviewer-last-clicked`
 
 ### Phase mapping to code edits
-- Phase 1
+- Phase 1 ✅
   - Extend `TeamMember` shape where used in `TimeboardModal.tsx` to include `github` and `jira`.
   - When identity changes, propagate `github`/`jira` into `SettingsContext` (set `githubUsername`/`jiraUsername` in-memory) so existing hooks keep working.
   - Add first-run identity modal; add a Settings action to reset identity.
   - Move team bulk actions (Export/Add/Upload) into `SettingsModal.tsx` under a "Team" section.
-- Phase 2
+- Phase 2 ✅
   - Create `openshift/` with Deployment/Service/Route manifests and `secrets.example.yaml`.
   - Add `README-openshift.md` with build/push/deploy steps.
   - Confirm `Dockerfile` at repo root; set `const PORT = process.env.PORT || 3017;` in `server/index.js`.
-- Phase 3 (hosted variant repo)
-  - Server: Read `GITHUB_TOKEN`, `JIRA_TOKEN`, `JIRA_BASE_URL` from env. Remove `token` from request bodies; add `/api/github/*` proxy endpoints (PR lists/details, reviews, comments, status, compare; paginate where needed). Optional `/api/github-image` proxy.
-  - Frontend: Switch GitHub fetches in `useApiQueries.ts` to server endpoints; remove token input fields from `SettingsModal.tsx`.
-  - OpenShift: Use `openshift/` manifests to deploy; inject Secrets; set probes.
-- Phase 4
+- Phase 3 ✅
+  - Server: Read `GITHUB_TOKEN`, `JIRA_TOKEN`, `JIRA_BASE_URL` from env. Remove `token` from request bodies; add `/api/github/*` proxy endpoints (PR lists/details, reviews, comments, status, compare; paginate where needed).
+  - Frontend: Switch GitHub/JIRA fetches in `useApiQueries.ts` to server endpoints; remove token input fields from `SettingsModal.tsx`.
+  - OpenShift: Use `openshift/` manifests to deploy; inject Secrets via `ocmui-dashboard-tokens`.
+  - Added "Log Out" button in Settings to reset identity.
+- Phase 3.5 (optional)
+  - Add OAuth proxy sidecar to deployment for Red Hat SSO integration.
+- Phase 4 (future)
   - Introduce server-side roster persistence (PVC-backed JSON or DB) with minimal CRUD; admin-only editor in Settings.
 
-### Endpoint inventory (current)
-- Browser → Express (JIRA only today)
+### Endpoint inventory (Phase 3 - all server-side)
+- Browser → Express (GitHub proxy)
+  - GET `/api/github/status`
+  - GET `/api/github/search/issues`
+  - GET `/api/github/repos/:owner/:repo/pulls/:pull_number`
+  - GET `/api/github/repos/:owner/:repo/pulls/:pull_number/reviews`
+  - GET `/api/github/repos/:owner/:repo/pulls/:pull_number/comments`
+  - GET `/api/github/repos/:owner/:repo/pulls/:pull_number/requested_reviewers`
+  - GET `/api/github/repos/:owner/:repo/issues/:issue_number/comments`
+  - GET `/api/github/repos/:owner/:repo/commits/:ref/status`
+  - GET `/api/github/repos/:owner/:repo/commits/:ref/check-runs`
+- Browser → Express (JIRA proxy)
+  - GET `/api/jira/status`
   - POST `/api/test-jira`
   - POST `/api/jira-ticket`
   - POST `/api/jira-sprint-tickets`
   - POST `/api/jira-child-issues`
-- Browser → GitHub (to be proxied in Phase 3)
-  - `https://api.github.com/search/issues` (PR search)
-  - `https://api.github.com/repos/{owner}/{repo}/pulls/{number}`
-  - `.../pulls/{number}/reviews`
-  - `.../issues/{number}/comments`
-  - `.../pulls/{number}/comments`
-  - `.../commits/{sha}/status`
-  - `.../compare/{base}...{head}`
 
-### Environment variables (Phase 3 hosted variant)
-- `PORT` – web server port (OpenShift often uses 8080)
+### Environment variables (implemented)
+- `PORT` – web server port (OpenShift uses 8080, local default 3017)
 - `JIRA_BASE_URL` – e.g., `https://issues.redhat.com`
-- `JIRA_TOKEN` – service-account token for JIRA
-- `GITHUB_TOKEN` – service-account token for GitHub
+- `JIRA_TOKEN` – service-account token for JIRA (stored in OpenShift Secret)
+- `GITHUB_TOKEN` – service-account token for GitHub (stored in OpenShift Secret)
+
+**Local development**: `GITHUB_TOKEN=xxx JIRA_TOKEN=xxx yarn start`
 
 ### Search tips for new contributors/agents
 - Start with semantic search for intent, then narrow to files:

@@ -230,14 +230,14 @@ const JiraLookupPanel: React.FC<JiraLookupPanelProps> = ({ onTicketSelect, selec
     );
   }
 
-  // Show error state for configuration issues
-  if (!isConfigured || !apiTokens.jira || !apiTokens.jiraUsername) {
+  // Show error state for configuration issues (only need username now - server provides token)
+  if (!isConfigured || !apiTokens.jiraUsername) {
     return (
       <BasePanel 
         title="JIRA Lookup" 
         icon={jiraLogo}
         iconAlt="JIRA"
-        error={new Error("JIRA credentials required: Please configure your JIRA token and username (email) in Settings")}
+        error={new Error("Please configure your JIRA email in Settings")}
       ><div>Configuration required</div></BasePanel>
     );
   }

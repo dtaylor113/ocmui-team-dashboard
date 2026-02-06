@@ -48,16 +48,10 @@ const AssociatedPRsPanel: React.FC<AssociatedPRsPanelProps> = ({ selectedTicket 
       setError(null);
       
       try {
-        // Search GitHub for PRs mentioning the JIRA ticket ID
+        // Search GitHub for PRs mentioning the JIRA ticket ID via server proxy
         const query = `is:pr ${selectedTicket}`;
         const response = await fetch(
-          `https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=10`,
-          {
-            headers: {
-              'Authorization': `Bearer ${apiTokens.github}`,
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          }
+          `/api/github/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=10`
         );
 
         if (!response.ok) {
@@ -70,8 +64,8 @@ const AssociatedPRsPanel: React.FC<AssociatedPRsPanelProps> = ({ selectedTicket 
         // Debug: Log PR search results
         // console.log(`📋 AssociatedPRsPanel found ${basePRs.length} PRs for ticket ${selectedTicket}`);
         
-        // Enhance PRs with reviewer data (same as main PR hooks)
-        const enhancedPRs = await enhancePRsWithReviewers(basePRs, apiTokens.github, apiTokens.githubUsername);
+        // Enhance PRs with reviewer data (server provides GitHub token)
+        const enhancedPRs = await enhancePRsWithReviewers(basePRs, apiTokens.githubUsername);
         setAssociatedPRs(enhancedPRs);
       } catch (err) {
         console.error('Error searching for associated PRs:', err);
@@ -83,7 +77,7 @@ const AssociatedPRsPanel: React.FC<AssociatedPRsPanelProps> = ({ selectedTicket 
 
     const timeoutId = setTimeout(searchForPRs, 500); // Debounce search
     return () => clearTimeout(timeoutId);
-  }, [selectedTicket, isConfigured, apiTokens.github]);
+  }, [selectedTicket, isConfigured, apiTokens.githubUsername]);
 
   const handlePRClick = (pr: GitHubPR) => {
     // Could add PR selection logic here in the future

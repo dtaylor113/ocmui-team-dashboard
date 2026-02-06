@@ -35,7 +35,7 @@ interface JiraHierarchyModalProps {
 const JiraHierarchyModal: React.FC<JiraHierarchyModalProps> = ({ jiraKey, isOpen, onClose }) => {
   const [hierarchyChain, setHierarchyChain] = useState<JiraHierarchyNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { userPreferences, apiTokens } = useSettings();
+  const { userPreferences } = useSettings(); // apiTokens not needed - server provides JIRA token
 
   // Fetch the initial ticket
   const { data: initialTicketData } = useJiraTicket(jiraKey);
@@ -75,12 +75,12 @@ const JiraHierarchyModal: React.FC<JiraHierarchyModalProps> = ({ jiraKey, isOpen
         level++;
         
         try {
-          const response = await fetch('http://localhost:3017/api/jira-ticket', {
+          const response = await fetch('/api/jira-ticket', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               jiraId: parentKey,
-              token: apiTokens.jira
+              token: '' // Server provides token
             })
           });
 

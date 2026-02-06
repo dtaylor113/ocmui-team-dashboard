@@ -98,35 +98,8 @@ interface MyPRsResponse {
 // }
 
 // API fetch functions
-// Helper to fetch all pages from GitHub REST endpoints that support pagination
-// Uses per_page=100 and iterates pages until a page returns fewer results than per_page
-// Limits to a reasonable number of pages to avoid excessive API usage.
-const fetchAllPages = async <T>(baseUrl: string, headers: Record<string, string>, perPage: number = 100, maxPages: number = 10): Promise<T[]> => {
-  const results: T[] = [];
-  let page = 1;
-  while (page <= maxPages) {
-    // Build URL with query params safely
-    const urlObj = new URL(baseUrl);
-    urlObj.searchParams.set('per_page', String(perPage));
-    urlObj.searchParams.set('page', String(page));
-
-    const response = await fetch(urlObj.toString(), { headers });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch page ${page} for ${baseUrl}: ${response.status} ${response.statusText}`);
-    }
-
-    const items: T[] = await response.json();
-    results.push(...items);
-
-    if (!Array.isArray(items) || items.length < perPage) {
-      break; // No more pages
-    }
-    page += 1;
-  }
-  return results;
-};
 const fetchSprintJiras = async (jiraUsername: string, jiraToken: string): Promise<SprintJirasResponse> => {
-  const response = await fetch('http://localhost:3017/api/jira-sprint-tickets', {
+  const response = await fetch('/api/jira-sprint-tickets', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -145,7 +118,7 @@ const fetchSprintJiras = async (jiraUsername: string, jiraToken: string): Promis
 };
 
 const fetchJiraTicket = async (jiraId: string, jiraToken: string) => {
-  const response = await fetch('http://localhost:3017/api/jira-ticket', {
+  const response = await fetch('/api/jira-ticket', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -165,7 +138,7 @@ const fetchJiraTicket = async (jiraId: string, jiraToken: string) => {
 
 // Fetch child issues for an epic/feature/parent
 const fetchJiraChildIssues = async (parentKey: string, jiraToken: string) => {
-  const response = await fetch('http://localhost:3017/api/jira-child-issues', {
+  const response = await fetch('/api/jira-child-issues', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parentKey, token: jiraToken })
@@ -177,7 +150,8 @@ const fetchJiraChildIssues = async (parentKey: string, jiraToken: string) => {
 };
 
 // Filter PRs to only those where the user is a reviewer (not author)
-const filterPRsForReviewerRole = async (prs: GitHubPR[], githubToken: string, githubUsername: string): Promise<GitHubPR[]> => {
+// Uses server-side GitHub proxy (no token needed - server provides it)
+const filterPRsForReviewerRole = async (prs: GitHubPR[], githubUsername: string): Promise<GitHubPR[]> => {
   const reviewerPRs: GitHubPR[] = [];
   
   for (const pr of prs) {
@@ -194,26 +168,16 @@ const filterPRsForReviewerRole = async (prs: GitHubPR[], githubToken: string, gi
         continue;
       }
       
-      const repoName = `${repoMatch[1]}/${repoMatch[2]}`;
+      const [, owner, repo] = repoMatch;
       
-      // Fetch PR details and reviews to check if user is a reviewer
+      // Fetch PR details and reviews via server-side proxy
       const [prResponse, reviewsResponse] = await Promise.all([
-        fetch(`https://api.github.com/repos/${repoName}/pulls/${pr.number}`, {
-          headers: {
-            'Authorization': `Bearer ${githubToken}`,
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        }),
-        fetch(`https://api.github.com/repos/${repoName}/pulls/${pr.number}/reviews`, {
-          headers: {
-            'Authorization': `Bearer ${githubToken}`,
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        })
+        fetch(`/api/github/repos/${owner}/${repo}/pulls/${pr.number}`),
+        fetch(`/api/github/repos/${owner}/${repo}/pulls/${pr.number}/reviews`)
       ]);
       
       if (!prResponse.ok || !reviewsResponse.ok) {
-        console.warn(`Failed to fetch details for PR #${pr.number} in ${repoName}`);
+        console.warn(`Failed to fetch details for PR #${pr.number} in ${owner}/${repo}`);
         continue;
       }
       
@@ -240,23 +204,19 @@ const filterPRsForReviewerRole = async (prs: GitHubPR[], githubToken: string, gi
   return reviewerPRs;
 };
 
-const fetchMyCodeReviews = async (githubUsername: string, githubToken: string): Promise<CodeReviewsResponse> => {
+// Uses server-side GitHub proxy (no token needed - server provides it)
+const fetchMyCodeReviews = async (githubUsername: string): Promise<CodeReviewsResponse> => {
   console.log(`🔍 fetchMyCodeReviews starting for user: ${githubUsername}`);
   
-  // Use broader search to find PRs involving the user, then filter for reviewer role (same as Plain JS version)
+  // Use broader search to find PRs involving the user, then filter for reviewer role
   const query = `is:pr is:open involves:${githubUsername}`;
-  const response = await fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100`, {
-    headers: {
-      'Authorization': `Bearer ${githubToken}`,
-      'Accept': 'application/vnd.github.v3+json'
-    }
-  });
+  const response = await fetch(`/api/github/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100`);
 
   if (!response.ok) {
-    if (response.status === 403) {
-      throw new Error('GitHub access denied. Please check your GitHub token permissions or try refreshing the page.');
-    } else if (response.status === 401) {
-      throw new Error('GitHub authentication failed. Please check your GitHub token in Settings.');
+    if (response.status === 503) {
+      throw new Error('GitHub service not available. Server may not have GitHub token configured.');
+    } else if (response.status === 403) {
+      throw new Error('GitHub access denied. Please try refreshing the page.');
     } else if (response.status === 422) {
       throw new Error('GitHub search query limit reached. Please try again in a few minutes.');
     } else {
@@ -270,12 +230,12 @@ const fetchMyCodeReviews = async (githubUsername: string, githubToken: string): 
   console.log(`📋 fetchMyCodeReviews found ${allPRs.length} PRs involving user, filtering for reviewer role...`);
   
   // Filter PRs to only those where the user is a reviewer (not author)
-  const reviewerPRs = await filterPRsForReviewerRole(allPRs, githubToken, githubUsername);
+  const reviewerPRs = await filterPRsForReviewerRole(allPRs, githubUsername);
   
   console.log(`📋 After filtering: ${reviewerPRs.length} PRs where user is a reviewer`);
   
   // Enhance PRs with reviewer data (limit to first 20 for better coverage)
-  const enhancedPRs = await enhancePRsWithReviewers(reviewerPRs.slice(0, 20), githubToken, githubUsername);
+  const enhancedPRs = await enhancePRsWithReviewers(reviewerPRs.slice(0, 20), githubUsername);
   
   console.log(`✅ fetchMyCodeReviews completed, returning ${enhancedPRs.length} enhanced PRs`);
   
@@ -286,25 +246,21 @@ const fetchMyCodeReviews = async (githubUsername: string, githubToken: string): 
   };
 };
 
-const fetchMyPRs = async (githubUsername: string, githubToken: string, status: 'open' | 'closed', page: number = 1): Promise<MyPRsResponse> => {
+// Uses server-side GitHub proxy (no token needed - server provides it)
+const fetchMyPRs = async (githubUsername: string, status: 'open' | 'closed', page: number = 1): Promise<MyPRsResponse> => {
   console.log(`🔍 fetchMyPRs starting for user: ${githubUsername}, status: ${status}, page: ${page}`);
   
   const perPage = status === 'closed' ? 10 : 20; // Smaller page size for closed PRs to enable pagination
   
-  // GitHub search for user's own PRs
+  // GitHub search for user's own PRs via server proxy
   const query = `is:pr author:${githubUsername} is:${status}`;
-  const response = await fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`, {
-    headers: {
-      'Authorization': `Bearer ${githubToken}`,
-      'Accept': 'application/vnd.github.v3+json'
-    }
-  });
+  const response = await fetch(`/api/github/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`);
 
   if (!response.ok) {
-    if (response.status === 403) {
-      throw new Error('GitHub access denied. Please check your GitHub token permissions or try refreshing the page.');
-    } else if (response.status === 401) {
-      throw new Error('GitHub authentication failed. Please check your GitHub token in Settings.');
+    if (response.status === 503) {
+      throw new Error('GitHub service not available. Server may not have GitHub token configured.');
+    } else if (response.status === 403) {
+      throw new Error('GitHub access denied. Please try refreshing the page.');
     } else if (response.status === 422) {
       throw new Error('GitHub search query limit reached. Please try again in a few minutes.');
     } else {
@@ -317,8 +273,8 @@ const fetchMyPRs = async (githubUsername: string, githubToken: string, status: '
   
   console.log(`📋 fetchMyPRs found ${basePRs.length} ${status} PRs (page ${page}), enhancing all...`);
   
-  // Enhance PRs with reviewer data (enhance all PRs on the page)
-  const enhancedPRs = await enhancePRsWithReviewers(basePRs, githubToken, githubUsername);
+  // Enhance PRs with reviewer data
+  const enhancedPRs = await enhancePRsWithReviewers(basePRs, githubUsername);
   
   console.log(`✅ fetchMyPRs completed, returning ${enhancedPRs.length} enhanced PRs`);
   
@@ -334,10 +290,10 @@ const fetchMyPRs = async (githubUsername: string, githubToken: string, status: '
 
 // Function to fetch detailed PR information including reviewers and comments
 // Returns reviewers plus mergeability and checks info to support UI badges
+// Uses server-side GitHub proxy (no token needed - server provides it)
 const fetchPRDetails = async (
   repoUrl: string,
   prNumber: number,
-  githubToken: string,
   currentUser: string
 ): Promise<{
   reviewers: GitHubReviewer[];
@@ -356,39 +312,33 @@ const fetchPRDetails = async (
   }
   
   const [, owner, repo] = repoMatch;
-  const repoName = `${owner}/${repo}`;
-
-  const headers = {
-    'Authorization': `Bearer ${githubToken}`,
-    'Accept': 'application/vnd.github.v3+json'
-  };
 
   // Debug: Log PR processing
   // console.log(`🚀 Starting fetchPRDetails for PR #${prNumber}`);
 
   try {
-    // Endpoints
-    const reviewsUrl = `https://api.github.com/repos/${repoName}/pulls/${prNumber}/reviews`;
-    const issueCommentsUrl = `https://api.github.com/repos/${repoName}/issues/${prNumber}/comments`;
-    const prDetailsUrl = `https://api.github.com/repos/${repoName}/pulls/${prNumber}`;
-    const requestedReviewersUrl = `https://api.github.com/repos/${repoName}/pulls/${prNumber}/requested_reviewers`;
+    // Fetch via server-side proxy endpoints
+    const reviewsUrl = `/api/github/repos/${owner}/${repo}/pulls/${prNumber}/reviews?per_page=100`;
+    const issueCommentsUrl = `/api/github/repos/${owner}/${repo}/issues/${prNumber}/comments?per_page=100`;
+    const prDetailsUrl = `/api/github/repos/${owner}/${repo}/pulls/${prNumber}`;
+    const requestedReviewersUrl = `/api/github/repos/${owner}/${repo}/pulls/${prNumber}/requested_reviewers`;
 
-    // Fetch ALL review events and issue comments with pagination, and fetch PR details/requested reviewers in parallel
-    const [reviews, generalComments, prDetails, requestedReviewersData] = await Promise.all([
-      fetchAllPages<any>(reviewsUrl, headers),
-      fetchAllPages<any>(issueCommentsUrl, headers),
-      (async () => {
-        const resp = await fetch(prDetailsUrl, { headers });
-        if (!resp.ok) {
-          throw new Error(`Failed to fetch PR details: ${resp.status} ${resp.statusText}`);
-        }
-        return resp.json();
-      })(),
-      (async () => {
-        const resp = await fetch(requestedReviewersUrl, { headers });
-        return resp.ok ? resp.json() : { users: [], teams: [] };
-      })()
+    // Fetch ALL review events and issue comments, and fetch PR details/requested reviewers in parallel
+    const [reviewsResp, commentsResp, prDetailsResp, requestedReviewersResp] = await Promise.all([
+      fetch(reviewsUrl),
+      fetch(issueCommentsUrl),
+      fetch(prDetailsUrl),
+      fetch(requestedReviewersUrl)
     ]);
+    
+    if (!prDetailsResp.ok) {
+      throw new Error(`Failed to fetch PR details: ${prDetailsResp.status} ${prDetailsResp.statusText}`);
+    }
+    
+    const reviews = reviewsResp.ok ? await reviewsResp.json() : [];
+    const generalComments = commentsResp.ok ? await commentsResp.json() : [];
+    const prDetails = await prDetailsResp.json();
+    const requestedReviewersData = requestedReviewersResp.ok ? await requestedReviewersResp.json() : { users: [], teams: [] };
 
     // Debug: Basic PR data (simplified logging)
     if (reviews.length === 0 && (prDetails?.requested_reviewers || []).length === 0) {
@@ -604,33 +554,10 @@ const fetchPRDetails = async (
     // Consider both 'behind' (out-of-date) and 'dirty' (merge conflicts) as requiring rebase/update
     let needsRebase: boolean = mergeableState === 'behind' || mergeableState === 'dirty';
     // Fallback: if state is unknown, use compare endpoint to detect behind-by commits
-    if (!needsRebase && (!mergeableState || mergeableState === 'unknown' || mergeableState === 'blocked')) {
-      try {
-        const baseRef = prDetails?.base?.ref;
-        const headRef = prDetails?.head?.ref;
-        // Owners (support cross-fork compares using owner:ref syntax)
-        const baseOwner = prDetails?.base?.repo?.owner?.login || owner;
-        const headOwner = prDetails?.head?.repo?.owner?.login || prDetails?.head?.user?.login;
-        if (baseRef && headRef) {
-          const baseParam = baseOwner ? `${baseOwner}:${baseRef}` : baseRef;
-          const headParam = headOwner ? `${headOwner}:${headRef}` : headRef;
-          const compareUrl = `https://api.github.com/repos/${repoName}/compare/${encodeURIComponent(baseParam)}...${encodeURIComponent(headParam)}`;
-          const compareResp = await fetch(compareUrl, { headers });
-          if (compareResp.ok) {
-            const compareData = await compareResp.json();
-            if (typeof compareData?.behind_by === 'number' && compareData.behind_by > 0) {
-              needsRebase = true;
-              // Treat as behind for UI purposes
-              mergeableState = 'behind';
-            }
-          }
-        }
-      } catch {
-        // Silently ignore fallback failures
-      }
-    }
+    // Note: Compare endpoint not currently proxied - using mergeable_state only for now
+    // TODO: Add compare endpoint to server proxy if needed
 
-    // Fetch combined status for checks (using head commit SHA)
+    // Fetch combined status for checks (using head commit SHA) via server proxy
     let checksState: 'success' | 'failure' | 'pending' | 'error' | undefined;
     let checksSummary: string | undefined;
     let checksTotal: number | undefined;
@@ -638,8 +565,8 @@ const fetchPRDetails = async (
     try {
       const headSha: string | undefined = prDetails?.head?.sha;
       if (headSha) {
-        const statusUrl = `https://api.github.com/repos/${repoName}/commits/${headSha}/status`;
-        const statusResp = await fetch(statusUrl, { headers });
+        const statusUrl = `/api/github/repos/${owner}/${repo}/commits/${headSha}/status`;
+        const statusResp = await fetch(statusUrl);
         if (statusResp.ok) {
           const statusData = await statusResp.json();
           const state = String(statusData?.state || '').toLowerCase();
@@ -694,7 +621,8 @@ const fetchPRDetails = async (
 };
 
 // Function to enhance PRs with reviewer data
-export const enhancePRsWithReviewers = async (prs: GitHubPR[], githubToken: string, currentUser: string): Promise<GitHubPR[]> => {
+// Uses server-side GitHub proxy (no token needed - server provides it)
+export const enhancePRsWithReviewers = async (prs: GitHubPR[], currentUser: string): Promise<GitHubPR[]> => {
   console.log(`🚀 enhancePRsWithReviewers starting with ${prs.length} PRs for user: ${currentUser}`);
   
   if (prs.length === 0) {
@@ -707,7 +635,7 @@ export const enhancePRsWithReviewers = async (prs: GitHubPR[], githubToken: stri
       try {
         const url = pr.repository_url || pr.url;
         console.log(`🔄 Processing PR ${index + 1}/${prs.length}: #${pr.number} (${pr.title?.substring(0, 50)}...)`);
-        const details = await fetchPRDetails(url, pr.number, githubToken, currentUser);
+        const details = await fetchPRDetails(url, pr.number, currentUser);
         console.log(`✅ Enhanced PR #${pr.number} with ${details.reviewers.length} reviewers (mergeable_state=${details.mergeable_state || 'unknown'}, checks=${details.checksState || 'n/a'})`);
         return {
           ...pr,
@@ -757,22 +685,18 @@ export interface EnhancedPRConversationResponse {
   threads: ConversationThread[];
 }
 
-const fetchPRConversation = async (repoName: string, prNumber: number, githubToken: string): Promise<EnhancedPRConversationResponse> => {
+// Uses server-side GitHub proxy (no token needed - server provides it)
+const fetchPRConversation = async (repoName: string, prNumber: number): Promise<EnhancedPRConversationResponse> => {
   console.log(`🔍 fetchPRConversation starting for ${repoName}#${prNumber}`);
   
-  const headers = {
-    'Authorization': `Bearer ${githubToken}`,
-    'Accept': 'application/vnd.github+json', // Updated to v4 API for better threading support
-    'User-Agent': 'OCMUI-Team-Dashboard'
-  };
-  
   try {
-    // Fetch ALL comment types: PR details, reviews, general comments, and inline review comments
+    // Fetch ALL comment types via server proxy: PR details, reviews, general comments, and inline review comments
+    const [owner, repo] = repoName.split('/');
     const [prResponse, reviewsResponse, commentsResponse, reviewCommentsResponse] = await Promise.all([
-      fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}`, { headers }),
-      fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}/reviews`, { headers }),
-      fetch(`https://api.github.com/repos/${repoName}/issues/${prNumber}/comments`, { headers }),
-      fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}/comments`, { headers })
+      fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}`),
+      fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/reviews`),
+      fetch(`/api/github/repos/${owner}/${repo}/issues/${prNumber}/comments`),
+      fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/comments`) // Inline review comments
     ]);
     
     if (!prResponse.ok || !reviewsResponse.ok || !commentsResponse.ok || !reviewCommentsResponse.ok) {
@@ -914,8 +838,8 @@ export const useMySprintJiras = () => {
 
   return useQuery({
     queryKey: queryKeys.mySprintJiras,
-    queryFn: () => fetchSprintJiras(apiTokens.jiraUsername, apiTokens.jira),
-    enabled: isConfigured && !!apiTokens.jiraUsername && !!apiTokens.jira,
+    queryFn: () => fetchSprintJiras(apiTokens.jiraUsername, ''), // Server provides token
+    enabled: isConfigured && !!apiTokens.jiraUsername, // No user token needed
     refetchInterval: 5 * 60 * 1000, // Every 5 minutes
     refetchIntervalInBackground: true, // Continue refreshing when window not focused
     retry: 3, // Retry failed requests
@@ -923,23 +847,22 @@ export const useMySprintJiras = () => {
 };
 
 export const useJiraTicket = (jiraId: string) => {
-  const { apiTokens } = useSettings();
-
+  // No user token needed - server provides token
   return useQuery({
     queryKey: queryKeys.jiraTicket(jiraId),
-    queryFn: () => fetchJiraTicket(jiraId, apiTokens.jira),
-    enabled: !!jiraId && !!apiTokens.jira,
+    queryFn: () => fetchJiraTicket(jiraId, ''),
+    enabled: !!jiraId,
     staleTime: 2 * 60 * 1000, // 2 minutes for individual tickets
     retry: false, // Don't retry failed requests to prevent delayed error messages
   });
 };
 
 export const useJiraChildIssues = (parentKey: string) => {
-  const { apiTokens } = useSettings();
+  // No user token needed - server provides token
   return useQuery({
     queryKey: queryKeys.jiraChildIssues(parentKey),
-    queryFn: () => fetchJiraChildIssues(parentKey, apiTokens.jira),
-    enabled: !!parentKey && !!apiTokens.jira,
+    queryFn: () => fetchJiraChildIssues(parentKey, ''),
+    enabled: !!parentKey,
     staleTime: 2 * 60 * 1000,
     retry: 1
   });
@@ -951,15 +874,14 @@ export const useMyCodeReviews = () => {
   console.log(`🔍 useMyCodeReviews hook called:`, {
     isConfigured,
     hasGithubUsername: !!apiTokens.githubUsername,
-    hasGithubToken: !!apiTokens.github,
     githubUsername: apiTokens.githubUsername,
-    enabled: isConfigured && !!apiTokens.githubUsername && !!apiTokens.github
+    enabled: isConfigured && !!apiTokens.githubUsername
   });
 
   return useQuery({
     queryKey: queryKeys.myCodeReviews,
-    queryFn: () => fetchMyCodeReviews(apiTokens.githubUsername, apiTokens.github),
-    enabled: isConfigured && !!apiTokens.githubUsername && !!apiTokens.github,
+    queryFn: () => fetchMyCodeReviews(apiTokens.githubUsername),
+    enabled: isConfigured && !!apiTokens.githubUsername, // No token needed - server provides it
     refetchInterval: 2 * 60 * 1000, // Every 2 minutes
     refetchIntervalInBackground: true, // Continue refreshing when window not focused
     retry: 3, // Retry failed requests
@@ -973,15 +895,14 @@ export const useMyPRs = (status: 'open' | 'closed' = 'open') => {
     status,
     isConfigured,
     hasGithubUsername: !!apiTokens.githubUsername,
-    hasGithubToken: !!apiTokens.github,
     githubUsername: apiTokens.githubUsername,
-    enabled: isConfigured && !!apiTokens.githubUsername && !!apiTokens.github
+    enabled: isConfigured && !!apiTokens.githubUsername
   });
 
   return useQuery({
     queryKey: queryKeys.myPRs(status),
-    queryFn: () => fetchMyPRs(apiTokens.githubUsername, apiTokens.github, status),
-    enabled: isConfigured && !!apiTokens.githubUsername && !!apiTokens.github,
+    queryFn: () => fetchMyPRs(apiTokens.githubUsername, status),
+    enabled: isConfigured && !!apiTokens.githubUsername, // No token needed - server provides it
     refetchInterval: 4 * 60 * 1000, // Every 4 minutes
     refetchIntervalInBackground: true, // Continue refreshing when window not focused
     retry: 3, // Retry failed requests
@@ -989,19 +910,16 @@ export const useMyPRs = (status: 'open' | 'closed' = 'open') => {
 };
 
 export const usePRConversation = (repoName: string, prNumber: number) => {
-  const { apiTokens } = useSettings();
-  
   console.log(`🔍 usePRConversation hook called:`, {
     repoName,
     prNumber,
-    hasGithubToken: !!apiTokens.github,
-    enabled: !!repoName && !!prNumber && !!apiTokens.github
+    enabled: !!repoName && !!prNumber
   });
 
   return useQuery<EnhancedPRConversationResponse>({
     queryKey: queryKeys.prConversation(repoName, prNumber),
-    queryFn: () => fetchPRConversation(repoName, prNumber, apiTokens.github),
-    enabled: !!repoName && !!prNumber && !!apiTokens.github,
+    queryFn: () => fetchPRConversation(repoName, prNumber),
+    enabled: !!repoName && !!prNumber, // No token needed - server provides it
     staleTime: 2 * 60 * 1000, // 2 minutes for PR conversation data
     refetchInterval: 3 * 60 * 1000, // Auto-refresh every 3 minutes to pick up new comments
     refetchIntervalInBackground: true, // Continue refreshing when window not focused

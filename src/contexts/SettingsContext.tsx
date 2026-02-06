@@ -13,6 +13,7 @@ interface SettingsContextType {
   updateUserPreferences: (preferences: Partial<UserPreferences>) => void;
   testGithubToken: (token: string) => Promise<{ success: boolean; message: string; username?: string }>;
   testJiraToken: (token: string) => Promise<{ success: boolean; message: string; userEmail?: string }>;
+  resetIdentity: () => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -43,11 +44,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
-  // Check if all required tokens are configured
-  const isConfigured = !!(apiTokens.github && 
-                         apiTokens.githubUsername && 
-                         apiTokens.jira && 
-                         apiTokens.jiraUsername);
+  // Check if all required settings are configured
+  // Note: Both GitHub and JIRA tokens are now server-side
+  // Users only need to provide their usernames
+  const isConfigured = !!(apiTokens.githubUsername && apiTokens.jiraUsername);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -121,69 +121,70 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     console.log('✅ User preferences updated successfully');
   };
 
-  const testGithubToken = async (token: string): Promise<{ success: boolean; message: string; username?: string }> => {
-    if (!token) {
-      return { success: false, message: 'Token is required' };
-    }
-
+  // Test if server-side GitHub token is configured
+  // Note: Users no longer need their own GitHub token - the server provides it
+  const testGithubToken = async (_token?: string): Promise<{ success: boolean; message: string; username?: string }> => {
     try {
-      const response = await fetch('https://api.github.com/user', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
+      const response = await fetch('/api/github/status');
 
       if (response.ok) {
-        const userData = await response.json();
-        // Return the username so it can be auto-filled
-        return { success: true, message: `Connected as ${userData.login}`, username: userData.login };
+        const data = await response.json();
+        if (data.configured) {
+          return { 
+            success: true, 
+            message: `GitHub connected via service account (${data.user})`,
+            username: data.user 
+          };
+        } else {
+          return { success: false, message: data.error || 'GitHub not configured on server' };
+        }
       } else {
-        const errorData = await response.json();
-        return { success: false, message: errorData.message || 'Invalid token' };
+        return { success: false, message: 'Could not verify GitHub configuration' };
       }
     } catch (error) {
-      console.error('GitHub token test error:', error);
-      return { success: false, message: 'Network error or invalid token' };
+      console.error('GitHub status check error:', error);
+      return { success: false, message: 'Network error - server may not be running' };
     }
   };
 
-  const testJiraToken = async (token: string): Promise<{ success: boolean; message: string; userEmail?: string }> => {
-    if (!token) {
-      return { success: false, message: 'Token is required' };
-    }
-
+  // Test if server-side JIRA token is configured
+  // Note: Users no longer need their own JIRA token - the server provides it
+  const testJiraToken = async (_token?: string): Promise<{ success: boolean; message: string; userEmail?: string }> => {
     try {
-      // Try to connect to the legacy app's backend server for JIRA testing
-      const response = await fetch('http://localhost:3017/api/test-jira', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ token })
-      });
+      const response = await fetch('/api/jira/status');
 
       if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          // Return the user's email so it can be auto-filled
-          const userEmail = result.user?.emailAddress;
-          const displayName = result.user?.displayName || 'Unknown';
+        const data = await response.json();
+        if (data.configured) {
           return { 
             success: true, 
-            message: `Connected as ${displayName}`,
-            userEmail 
+            message: `JIRA connected via service account (${data.user})`,
+            userEmail: data.email
           };
         } else {
-          return { success: false, message: result.error || 'Authentication failed' };
+          return { success: false, message: data.error || 'JIRA not configured on server' };
         }
       } else {
-        return { success: false, message: 'Server error - please try again' };
+        return { success: false, message: 'Could not verify JIRA configuration' };
       }
     } catch (error) {
-      console.error('JIRA token test error:', error);
-      return { success: false, message: 'Backend server not running - start legacy app for JIRA testing' };
+      console.error('JIRA status check error:', error);
+      return { success: false, message: 'Network error - server may not be running' };
     }
+  };
+
+  // Reset all identity data and reload to trigger first-run flow
+  const resetIdentity = () => {
+    // Clear all dashboard-related localStorage items
+    localStorage.removeItem('ocmui_api_tokens');
+    localStorage.removeItem('ocmui_user_preferences');
+    localStorage.removeItem('ocmui_selected_team_member');
+    localStorage.removeItem('ocmui_identity_set');
+    
+    console.log('🔄 Identity reset - reloading page...');
+    
+    // Reload the page to trigger the first-run "Who are you?" flow
+    window.location.reload();
   };
 
   const value: SettingsContextType = {
@@ -196,7 +197,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     saveSettings,
     updateUserPreferences,
     testGithubToken,
-    testJiraToken
+    testJiraToken,
+    resetIdentity
   };
 
   return (

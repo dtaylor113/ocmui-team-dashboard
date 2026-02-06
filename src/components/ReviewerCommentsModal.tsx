@@ -40,16 +40,12 @@ const ReviewerCommentsModal: React.FC<ReviewerCommentsModalProps> = ({
       setError(null);
       
       try {
-        const headers = {
-          'Authorization': `Bearer ${apiTokens.github}`,
-          'Accept': 'application/vnd.github.v3+json'
-        };
-
-        // Fetch reviews, general comments, and inline review comments in parallel
+        // Fetch via server proxy (no token needed - server provides it)
+        const [owner, repo] = repoName.split('/');
         const [reviewsResponse, commentsResponse, reviewCommentsResponse] = await Promise.all([
-          fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}/reviews`, { headers }),
-          fetch(`https://api.github.com/repos/${repoName}/issues/${prNumber}/comments`, { headers }),
-          fetch(`https://api.github.com/repos/${repoName}/pulls/${prNumber}/comments`, { headers }) // Inline review comments
+          fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/reviews`),
+          fetch(`/api/github/repos/${owner}/${repo}/issues/${prNumber}/comments`),
+          fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/comments`) // Inline review comments
         ]);
 
         if (!reviewsResponse.ok || !commentsResponse.ok || !reviewCommentsResponse.ok) {
@@ -117,7 +113,7 @@ const ReviewerCommentsModal: React.FC<ReviewerCommentsModalProps> = ({
     };
 
     fetchComments();
-  }, [isOpen, reviewer, repoName, prNumber, apiTokens.github]);
+  }, [isOpen, reviewer, repoName, prNumber]); // No token dependency - server provides it
 
   // Parse comments after they're fetched
   useEffect(() => {

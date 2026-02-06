@@ -42,13 +42,25 @@
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 🌐 Use the Hosted Version (Recommended)
+
+The dashboard is deployed and ready to use:
+
+**https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com**
+
+- No tokens required! Server provides GitHub and JIRA access
+- Just select yourself from the team roster and confirm your usernames
+
+---
+
+### 💻 Local Development
+
+#### Prerequisites
 - Node.js 18+
 - Yarn package manager
-- GitHub personal access token
-- Red Hat JIRA personal access token
+- Service account tokens (for full functionality)
 
-### Installation & Setup
+#### Installation & Setup
 
 1. **Clone the repository**
    ```bash
@@ -63,28 +75,41 @@
 
 3. **Start the application**
    ```bash
+   # With service account tokens (full functionality)
+   GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start
+
+   # Or without tokens (GitHub/JIRA features will be disabled)
    yarn start
    ```
    - Builds and serves the application at `http://localhost:3017`
    - **Single server setup** - Production-ready architecture
-   - Automatically opens in browser
 
-4. **Configure tokens**
+4. **Configure your identity**
 
    - Open `http://localhost:3017`
    - Click Settings ⚙️ in the top-right corner
-   ![Settings Modal](src/assets/team_dashboard_settings_screenshot.png)
-   - Add your GitHub personal access token
-   - Add your JIRA token and email address
-   - Settings are saved locally in your browser
+   - Verify GitHub and JIRA connections show ✅ (if tokens are set)
+   - Enter your **GitHub username** and **JIRA email**
+   - Click **Save**
+
+> **Note**: Users no longer need their own API tokens! The server provides them via environment variables.
 
 ## 🔧 Development (optional)
 
 ```bash
-yarn start:dev
+# With hot reloading
+GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
 ```
 - **API Server**: `http://localhost:3017` (Express.js)
 - **React App**: `http://localhost:5174` (Vite HMR)
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | GitHub personal access token (service account) |
+| `JIRA_TOKEN` | Red Hat JIRA personal access token |
+| `PORT` | Server port (default: 3017) |
 
 ## 📖 Documentation
 
@@ -107,14 +132,24 @@ lsof -ti:3017 | xargs kill -9
 yarn start
 ```
 
+**"GitHub service not available" / "JIRA not configured" errors (local):**
+- You need to set the environment variables when starting the server:
+  ```bash
+  GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start
+  ```
+- Or use the hosted version which has tokens pre-configured
+
 **GitHub images not loading:**
 - Images automatically fallback to clickable links when blocked
 - Use `yarn start` (single server) for optimal image loading
 
-**JIRA authentication errors:**
-- Verify your JIRA token in Settings
-- Ensure you're using a Personal Access Token, not password
-- Check your Red Hat JIRA access
+**"0 Sprint JIRAs" but you have tickets:**
+- Verify your JIRA email is correct in Settings
+- Check that the server has a valid JIRA token (Settings → Check Status)
+
+**Want to test the first-run flow again?**
+- Click Settings → 🚪 Log Out
+- This clears all local data and restarts the "Who are you?" flow
 
 ## 📖 Documentation
 

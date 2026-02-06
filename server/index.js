@@ -25,12 +25,21 @@ app.use('/api', (req, res, next) => {
     }
 });
 
+// Server-side JIRA token (loaded from environment variable)
+const JIRA_TOKEN = process.env.JIRA_TOKEN;
+
 // JIRA ticket fetch endpoint
+// Uses server-side token (user token no longer required)
 app.post('/api/jira-ticket', async (req, res) => {
-    const { jiraId, token } = req.body;
+    const { jiraId, token: userToken } = req.body;
+    const token = JIRA_TOKEN || userToken; // Prefer server token, fallback to user token
     
-    if (!jiraId || !token) {
-        return res.status(400).json({ error: 'JIRA ID and token are required' });
+    if (!jiraId) {
+        return res.status(400).json({ error: 'JIRA ID is required' });
+    }
+    
+    if (!token) {
+        return res.status(503).json({ error: 'JIRA token not configured on server' });
     }
     
     try {
@@ -309,11 +318,67 @@ app.post('/api/jira-ticket', async (req, res) => {
 });
 
 // JIRA API proxy endpoint
+// JIRA status endpoint - check if server-side token is configured
+app.get('/api/jira/status', async (req, res) => {
+    if (!JIRA_TOKEN) {
+        return res.status(503).json({ 
+            configured: false, 
+            error: 'JIRA token not configured on server' 
+        });
+    }
+    
+    try {
+        const options = {
+            hostname: 'issues.redhat.com',
+            path: '/rest/api/2/myself',
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${JIRA_TOKEN}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'OCMUI-Team-Dashboard'
+            }
+        };
+        
+        const jiraRequest = https.request(options, (jiraRes) => {
+            let data = '';
+            jiraRes.on('data', (chunk) => { data += chunk; });
+            jiraRes.on('end', () => {
+                if (jiraRes.statusCode === 200) {
+                    try {
+                        const userData = JSON.parse(data);
+                        res.json({ 
+                            configured: true, 
+                            user: userData.displayName || userData.name,
+                            email: userData.emailAddress,
+                            message: 'JIRA service account is active'
+                        });
+                    } catch (e) {
+                        res.status(500).json({ configured: false, error: 'Failed to parse JIRA response' });
+                    }
+                } else {
+                    res.status(jiraRes.statusCode).json({ configured: false, error: 'JIRA token validation failed' });
+                }
+            });
+        });
+        
+        jiraRequest.on('error', (error) => {
+            res.status(500).json({ configured: false, error: error.message });
+        });
+        
+        jiraRequest.end();
+    } catch (error) {
+        res.status(500).json({ configured: false, error: error.message });
+    }
+});
+
+// JIRA API test endpoint (for user-provided tokens, kept for backward compatibility)
 app.post('/api/test-jira', async (req, res) => {
-    const { token } = req.body;
+    const { token: userToken } = req.body;
+    const token = userToken || JIRA_TOKEN; // Use provided token or fall back to server token
     
     if (!token) {
-        return res.status(400).json({ error: 'Token is required' });
+        return res.status(400).json({ error: 'Token is required and server has no default configured' });
     }
     
     try {
@@ -383,11 +448,18 @@ app.post('/api/test-jira', async (req, res) => {
 });
 
 // JIRA sprint tickets endpoint
+// JIRA sprint tickets endpoint
+// Uses server-side token (user token no longer required)
 app.post('/api/jira-sprint-tickets', async (req, res) => {
-    const { jiraUsername, token } = req.body;
+    const { jiraUsername, token: userToken } = req.body;
+    const token = JIRA_TOKEN || userToken; // Prefer server token
     
-    if (!jiraUsername || !token) {
-        return res.status(400).json({ error: 'JIRA username and token are required' });
+    if (!jiraUsername) {
+        return res.status(400).json({ error: 'JIRA username is required' });
+    }
+    
+    if (!token) {
+        return res.status(503).json({ error: 'JIRA token not configured on server' });
     }
     
     try {
@@ -555,13 +627,259 @@ app.post('/api/jira-sprint-tickets', async (req, res) => {
 });
 
 
+// ============================================================================
+// GITHUB API PROXY ENDPOINTS (Phase 3 - Server-Side Tokens)
+// ============================================================================
+
+// Server-side GitHub token (loaded from environment variable)
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+
+// Helper function to make GitHub API requests
+const makeGitHubRequest = (path, method = 'GET') => {
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: 'api.github.com',
+            path: path,
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'OCMUI-Team-Dashboard'
+            }
+        };
+        
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    resolve({ statusCode: res.statusCode, data: parsed, headers: res.headers });
+                } catch (e) {
+                    resolve({ statusCode: res.statusCode, data: data, headers: res.headers });
+                }
+            });
+        });
+        
+        req.on('error', reject);
+        req.end();
+    });
+};
+
+// GitHub token test endpoint (verifies server-side token is configured)
+app.get('/api/github/status', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ 
+            configured: false, 
+            error: 'GitHub token not configured on server' 
+        });
+    }
+    
+    try {
+        const result = await makeGitHubRequest('/user');
+        if (result.statusCode === 200) {
+            res.json({ 
+                configured: true, 
+                user: result.data.login,
+                message: 'GitHub service account is active'
+            });
+        } else {
+            res.status(result.statusCode).json({ 
+                configured: false, 
+                error: 'GitHub token validation failed' 
+            });
+        }
+    } catch (error) {
+        res.status(500).json({ configured: false, error: error.message });
+    }
+});
+
+// GitHub search endpoint - searches PRs by query
+// Query params: q (search query), sort, order, per_page, page
+app.get('/api/github/search/issues', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { q, sort = 'updated', order = 'desc', per_page = 20, page = 1 } = req.query;
+    
+    if (!q) {
+        return res.status(400).json({ error: 'Search query (q) is required' });
+    }
+    
+    try {
+        const path = `/search/issues?q=${encodeURIComponent(q)}&sort=${sort}&order=${order}&per_page=${per_page}&page=${page}`;
+        const result = await makeGitHubRequest(path);
+        
+        if (result.statusCode === 200) {
+            res.json(result.data);
+        } else {
+            res.status(result.statusCode).json(result.data);
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub PR details endpoint
+// GET /api/github/repos/:owner/:repo/pulls/:pull_number
+app.get('/api/github/repos/:owner/:repo/pulls/:pull_number', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, pull_number } = req.params;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/pulls/${pull_number}`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub PR reviews endpoint
+app.get('/api/github/repos/:owner/:repo/pulls/:pull_number/reviews', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, pull_number } = req.params;
+    const { per_page = 100, page = 1 } = req.query;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/pulls/${pull_number}/reviews?per_page=${per_page}&page=${page}`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub PR requested reviewers endpoint
+app.get('/api/github/repos/:owner/:repo/pulls/:pull_number/requested_reviewers', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, pull_number } = req.params;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/pulls/${pull_number}/requested_reviewers`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub issue comments endpoint
+app.get('/api/github/repos/:owner/:repo/issues/:issue_number/comments', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, issue_number } = req.params;
+    const { per_page = 100, page = 1 } = req.query;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/issues/${issue_number}/comments?per_page=${per_page}&page=${page}`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub PR commits endpoint (for CI status checks)
+app.get('/api/github/repos/:owner/:repo/pulls/:pull_number/commits', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, pull_number } = req.params;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/pulls/${pull_number}/commits`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub commit status endpoint
+app.get('/api/github/repos/:owner/:repo/commits/:ref/status', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, ref } = req.params;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/commits/${ref}/status`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub check runs endpoint
+app.get('/api/github/repos/:owner/:repo/commits/:ref/check-runs', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, ref } = req.params;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/commits/${ref}/check-runs`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GitHub PR comments endpoint (inline review comments)
+app.get('/api/github/repos/:owner/:repo/pulls/:pull_number/comments', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+    
+    const { owner, repo, pull_number } = req.params;
+    const { per_page = 100, page = 1 } = req.query;
+    
+    try {
+        const path = `/repos/${owner}/${repo}/pulls/${pull_number}/comments?per_page=${per_page}&page=${page}`;
+        const result = await makeGitHubRequest(path);
+        res.status(result.statusCode).json(result.data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================================
+// JIRA API ENDPOINTS (continued)
+// ============================================================================
+
 // Fetch child issues for an Epic or Feature
 // Request body: { parentKey: string, token: string }
 // Returns: { success, total, issues: [{ key, summary, assignee, status, type }] }
+// Fetch child issues for an Epic or Feature
+// Uses server-side token (user token no longer required)
 app.post('/api/jira-child-issues', async (req, res) => {
-    const { parentKey, token } = req.body;
-    if (!parentKey || !token) {
-        return res.status(400).json({ error: 'parentKey and token are required' });
+    const { parentKey, token: userToken } = req.body;
+    const token = JIRA_TOKEN || userToken; // Prefer server token
+    
+    if (!parentKey) {
+        return res.status(400).json({ error: 'parentKey is required' });
+    }
+    
+    if (!token) {
+        return res.status(503).json({ error: 'JIRA token not configured on server' });
     }
 
     try {
