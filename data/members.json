@@ -23,71 +23,67 @@
   {
     "name": "Trevor Hendricks",
     "role": "dev",
-    "tz": "America/New_York"
+    "tz": "America/New_York",
+    "jira": "thendric@redhat.com"
   },
   {
     "name": "Lakshmi Shivanthi",
     "role": "qe dev",
-    "tz": "America/Los_Angeles"
+    "tz": "America/Los_Angeles",
+    "jira": "lamarach@redhat.com"
   },
   {
     "name": "Jason Loss",
     "role": "qe dev",
-    "tz": "America/New_York"
+    "tz": "America/New_York",
+    "jira": "jloss@redhat.com"
   },
   {
     "name": "Joseph Caiani",
     "role": "manager",
-    "tz": "America/New_York"
-  },
-  {
-    "name": "Deepika Ramakrishnan",
-    "role": "sr. manager",
-    "tz": "America/New_York"
+    "tz": "America/New_York",
+    "jira": "jcaiani@redhat.com"
   },
   {
     "name": "Roberto Emanuel",
     "role": "architect",
-    "tz": "Europe/Rome"
-  },
-  {
-    "name": "Ales Pecha",
-    "role": "qe dev",
-    "tz": "Europe/Prague"
+    "tz": "Europe/Rome",
+    "jira": "remanuel@redhat.com"
   },
   {
     "name": "Denis Ragan",
     "role": "qe dev",
-    "tz": "Europe/Berlin"
+    "tz": "Europe/Berlin",
+    "jira": "dragan@redhat.com"
   },
   {
-    "name": "Eliran (Lyn) Malka",
+    "name": "Lyn Malka",
     "role": "dev",
-    "tz": "Asia/Jerusalem"
+    "tz": "Asia/Jerusalem",
+    "jira": "emalka@redhat.com"
   },
   {
     "name": "Lior Keren",
     "role": "dev",
-    "tz": "Asia/Jerusalem"
+    "tz": "Asia/Jerusalem",
+    "jira": "lkeren@redhat.com"
   },
   {
     "name": "Netta Meiri",
     "role": "intern",
-    "tz": "Asia/Jerusalem"
+    "tz": "Asia/Jerusalem",
+    "jira": "nmeiri@redhat.com"
   },
   {
     "name": "Liza Gilman",
     "role": "dev",
-    "tz": "Asia/Jerusalem"
-  },
-  {
-    "name": "Nir Farkas",
-    "role": "UX",
-    "tz": "Asia/Jerusalem"
+    "tz": "Asia/Jerusalem",
+    "jira": "egilman@redhat.com"
   },
   {
     "name": "Jaya Mekkattillan",
     "role": "qe lead",
-    "tz": "Asia/Calcutta"
+    "tz": "Asia/Calcutta",
+    "jira": "jmekkatt@redhat.com"
   }
 ]

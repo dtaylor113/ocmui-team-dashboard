@@ -11,7 +11,19 @@ This guide covers deploying the dashboard to an OpenShift cluster (ROSA, OSD, or
 
 ## Quick Start
 
-### 1. Build and Push the Container Image
+### Option A: Use the Deploy Script (Recommended)
+
+```bash
+# Full build and deploy
+./deploy.sh
+
+# Skip build (just push and deploy existing image)
+./deploy.sh --skip-build
+```
+
+### Option B: Manual Steps
+
+#### 1. Build and Push the Container Image
 
 ```bash
 # Set your registry (examples)
@@ -19,8 +31,8 @@ export IMAGE_REGISTRY=quay.io/your-username
 # or for OpenShift internal registry:
 # export IMAGE_REGISTRY=$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')/your-namespace
 
-# Build the image
-podman build -t $IMAGE_REGISTRY/ocmui-team-dashboard:latest .
+# Build the image (cross-compile for x86_64 if on Apple Silicon)
+podman build --platform linux/amd64 -t $IMAGE_REGISTRY/ocmui-team-dashboard:latest .
 
 # Push to registry
 podman push $IMAGE_REGISTRY/ocmui-team-dashboard:latest

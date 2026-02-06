@@ -111,6 +111,20 @@ GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
 | `JIRA_TOKEN` | Red Hat JIRA personal access token |
 | `PORT` | Server port (default: 3017) |
 
+## 🚢 Deploying to OpenShift
+
+A convenient deploy script is included:
+
+```bash
+# Full build and deploy
+./deploy.sh
+
+# Skip build (just push and deploy existing image)
+./deploy.sh --skip-build
+```
+
+See `README-openshift.md` for detailed deployment documentation.
+
 ## 📖 Documentation
 
 - See `APP_TECH_NOTES.md` for detailed architecture, backend, and API integration.

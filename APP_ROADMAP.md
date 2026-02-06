@@ -147,18 +147,28 @@ Prerequisites
 
 ---
 
-## Phase 4 – Shared Team Roster Persistence (post-hosting)
+## Phase 4 – Shared Team Roster Persistence ✅ COMPLETE
 
 Goal: Replace per-browser `localStorage` editing with a team-shared persistence.
 
-Options (to be evaluated)
-- Server-side JSON with CRUD endpoints, stored on a PVC; editor UI in Settings (admin-only toggle).
-- ConfigMap ingestion + admin UI that generates a new ConfigMap (cluster-admin flow).
-- Lightweight database (e.g., SQLite on PVC or a managed Postgres) with simple RBAC.
+**Completed: February 6, 2026**
 
-Acceptance
-- Team roster changes can be edited by designated maintainers and are visible to all users.
-- Backup/restore path defined and documented.
+What Was Implemented
+- Server-side CRUD API endpoints (`/api/team/members`)
+- PersistentVolumeClaim (PVC) for persistent storage
+- Data stored at `/data/members.json` on the server
+- Frontend uses API with localStorage fallback for local dev
+- Removed Export/Reload/Add buttons from Timeboard UI (security)
+- Added Refresh button to re-fetch roster from server
+- Admin roster management via `oc rsh` or git seed file
+- Deploy script (`deploy.sh`) for easy deployments
+
+Current User Experience
+- ✅ All users see the same team roster
+- ✅ New users can add themselves via "I'm not listed" in First Run
+- ✅ Existing members can edit their own entry (Edit button)
+- ✅ Admin can add/edit/delete via CLI or seed file
+- ✅ Changes persist across pod restarts (PVC-backed)
 
 ---
 
@@ -200,8 +210,8 @@ Notes
 - [x] Phase 2 manifests and Dockerfile ready
 - [x] Phase 2.5 Initial ROSA deployment live! 🎉
 - [x] Phase 3 server-side tokens - complete! 🔐
+- [x] Phase 4 shared roster persistence - complete! 👥
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
-- [ ] Phase 4 shared roster persistence
 
 
 ---
@@ -248,10 +258,13 @@ Use this section to quickly navigate the codebase and implement each phase.
   - Frontend: Switch GitHub/JIRA fetches in `useApiQueries.ts` to server endpoints; remove token input fields from `SettingsModal.tsx`.
   - OpenShift: Use `openshift/` manifests to deploy; inject Secrets via `ocmui-dashboard-tokens`.
   - Added "Log Out" button in Settings to reset identity.
+- Phase 4 ✅
+  - Server: Added `/api/team/members` CRUD endpoints with PVC-backed JSON storage.
+  - Frontend: TimeboardModal and FirstRunIdentityModal fetch from API; removed Export/Reload/Add buttons for security; added Refresh button.
+  - OpenShift: Added `pvc.yaml` and volume mounts in deployment.
+  - Added `deploy.sh` script for easy deployments.
 - Phase 3.5 (optional)
   - Add OAuth proxy sidecar to deployment for Red Hat SSO integration.
-- Phase 4 (future)
-  - Introduce server-side roster persistence (PVC-backed JSON or DB) with minimal CRUD; admin-only editor in Settings.
 
 ### Endpoint inventory (Phase 3 - all server-side)
 - Browser → Express (GitHub proxy)
