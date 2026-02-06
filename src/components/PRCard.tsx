@@ -178,6 +178,11 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
   };
 
   const handleCardClick = () => {
+    // Don't trigger card click if user is selecting text
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) {
+      return;
+    }
     if (onClick) {
       onClick(pr);
     }

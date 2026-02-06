@@ -1596,6 +1596,12 @@ html, body {
 .collapsible-section-content {
   padding-bottom: 16px;
   animation: fadeIn 0.2s ease-in;
+  /* Allow text selection in content areas */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  cursor: text;
 }
 
 @keyframes fadeIn {
@@ -1671,6 +1677,10 @@ html, body {
   overflow-y: auto; /* Scroll when content overflows max-height */
   overflow-x: hidden; /* Hide horizontal overflow */
   resize: none; /* Remove resize functionality */
+  /* Allow text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 /* Legacy classes maintained for backward compatibility - styles now handled by .markdown-container */
@@ -2241,6 +2251,10 @@ html, body {
 /* Comments Content */
 .comments-content {
   max-height: 250px;
+  /* Allow text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 /* Apply the same JIRA formatting to comment bodies */
