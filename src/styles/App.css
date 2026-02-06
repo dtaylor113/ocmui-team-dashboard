@@ -48,7 +48,9 @@ html, body {
   flex: 1;
 }
 
-.header-center .secondary-tabs {
+.header-center .secondary-tabs,
+.header-center .navigation-two-level,
+.header-center .navigation-inline {
   display: flex;
   justify-content: center;
   padding: 0;
@@ -874,6 +876,102 @@ html, body {
   display: none;
 }
 
+/* ===== INLINE GROUPED NAVIGATION ===== */
+
+.navigation-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+/* Divider between groups */
+.nav-divider {
+  color: #444;
+  font-size: 14px;
+  padding: 0 16px;
+  user-select: none;
+}
+
+/* Group container */
+.nav-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Primary tab button (JIRA, GitHub, Other) */
+.nav-primary-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-primary-tab:hover {
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-primary-tab.active {
+  color: #e5e7eb;
+}
+
+.nav-group-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+.nav-primary-tab.active .nav-group-icon {
+  opacity: 1;
+}
+
+/* Clickable tab buttons */
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.nav-tab:hover {
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #374151;
+}
+
+.nav-tab.active {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.12);
+  border-color: #60a5fa;
+}
+
+.nav-tab-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+/* Legacy single-row styles (kept for compatibility) */
 .secondary-tabs {
   display: flex;
   justify-content: center;

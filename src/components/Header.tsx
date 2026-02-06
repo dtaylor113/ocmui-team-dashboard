@@ -2,21 +2,30 @@ import React, { useState } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import NavigationTabs from './NavigationTabs';
 import TimeboardModal from './TimeboardModal';
-import type { TabType } from '../App';
+import type { TabType, PrimaryTabType } from '../App';
 import ocmuiLogo from '../assets/icon48.png';
 
 interface HeaderProps {
-  tabConfig: Array<{
-    id: TabType;
+  primaryTabConfig: Array<{
+    id: PrimaryTabType;
     label: string;
-    icon: string | null;
-    emoji?: string;
+    icon: string;
   }>;
-  currentTab: TabType;
-  onTabChange: (tab: TabType) => void;
+  secondaryTabConfig: Record<PrimaryTabType, Array<{ id: TabType; label: string; icon?: string }>>;
+  currentPrimaryTab: PrimaryTabType;
+  currentSecondaryTab: TabType;
+  onPrimaryTabChange: (tab: PrimaryTabType) => void;
+  onSecondaryTabChange: (tab: TabType) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ tabConfig, currentTab, onTabChange }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  primaryTabConfig, 
+  secondaryTabConfig,
+  currentPrimaryTab, 
+  currentSecondaryTab,
+  onPrimaryTabChange,
+  onSecondaryTabChange
+}) => {
   const { openSettingsModal, isConfigured } = useSettings();
   const [isTimeboardModalOpen, setIsTimeboardModalOpen] = useState(false);
 
@@ -32,9 +41,12 @@ const Header: React.FC<HeaderProps> = ({ tabConfig, currentTab, onTabChange }) =
         
         <div className="header-center">
           <NavigationTabs
-            tabConfig={tabConfig}
-            currentTab={currentTab}
-            onTabChange={onTabChange}
+            primaryTabConfig={primaryTabConfig}
+            secondaryTabConfig={secondaryTabConfig}
+            currentPrimaryTab={currentPrimaryTab}
+            currentSecondaryTab={currentSecondaryTab}
+            onPrimaryTabChange={onPrimaryTabChange}
+            onSecondaryTabChange={onSecondaryTabChange}
           />
         </div>
         

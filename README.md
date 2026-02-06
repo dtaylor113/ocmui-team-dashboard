@@ -24,12 +24,19 @@
 
 ## 📱 Interface
 
-### Navigation Tabs
-1. **My Sprint JIRAs** - Current sprint tickets with status tracking
-2. **My Code Reviews** - PRs awaiting user review 
-3. **My PRs** - Personal PRs with open/closed filtering  
-4. **JIRA Lookup** - Search any JIRA ticket with history
-5. **Feature Flags** - Unleash feature flag dashboard comparing staging vs production
+### Navigation (Two-Level Tabs)
+
+The header uses an **inline grouped navigation** with primary categories and their subtabs:
+
+| Primary Tab | Secondary Tabs | Description |
+|-------------|----------------|-------------|
+| **🎫 JIRA** | My Sprint JIRAs, JIRA Lookup | JIRA ticket management |
+| **🐙 GitHub** | My Code Reviews, My PRs | GitHub PR tracking |
+| **••• Other** | 🚩 Feature Flags | Unleash feature flags dashboard |
+
+- Click a **primary tab** to switch categories and reveal its subtabs
+- Click a **secondary tab** to switch views within that category
+- Active primary tab is highlighted; inactive tabs are dimmed but clickable
 
 ### Key Features
 - **Auto-Association**: Click any JIRA to see related PRs, or any PR to see related JIRAs

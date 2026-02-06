@@ -10,58 +10,73 @@ import githubIcon from './assets/githubIcon.png';
 import unleashIcon from './assets/unleash.png';
 import './styles/App.css';
 
-// Define our simplified single-row navigation structure
+// Tab types for the application
 export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'jira-lookup' | 'feature-flags';
+export type PrimaryTabType = 'jira' | 'github' | 'other';
 
 interface AppState {
   currentTab: TabType;
+  primaryTab: PrimaryTabType;
 }
 
 const TAB_STORAGE_KEY = 'ocmui_current_tab';
 
-const isValidTab = (value: string): value is TabType => {
-  return tabConfig.some(t => t.id === value);
+// Generic "more" icon for Other tab (inline SVG as data URI)
+const moreIcon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239ca3af'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/svg%3E";
+
+// Primary tab configuration
+const primaryTabConfig = [
+  { id: 'jira' as PrimaryTabType, label: 'JIRA', icon: jiraLogo },
+  { id: 'github' as PrimaryTabType, label: 'GitHub', icon: githubIcon },
+  { id: 'other' as PrimaryTabType, label: 'Other', icon: moreIcon }
+];
+
+// Secondary tabs grouped by primary
+const secondaryTabConfig: Record<PrimaryTabType, Array<{ id: TabType; label: string; icon?: string }>> = {
+  jira: [
+    { id: 'my-sprint-jiras', label: 'My Sprint JIRAs' },
+    { id: 'jira-lookup', label: 'JIRA Lookup' }
+  ],
+  github: [
+    { id: 'my-code-reviews', label: 'My Code Reviews' },
+    { id: 'my-prs', label: 'My PRs' }
+  ],
+  other: [
+    { id: 'feature-flags', label: 'Feature Flags', icon: unleashIcon }
+  ]
 };
 
-const tabConfig = [
-  { 
-    id: 'my-sprint-jiras' as TabType, 
-    label: 'My Sprint JIRAs', 
-    icon: jiraLogo 
-  },
-  { 
-    id: 'my-code-reviews' as TabType, 
-    label: 'My Code Reviews', 
-    icon: githubIcon 
-  },
-  { 
-    id: 'my-prs' as TabType, 
-    label: 'My PRs', 
-    icon: githubIcon 
-  },
-  { 
-    id: 'jira-lookup' as TabType, 
-    label: 'JIRA Lookup', 
-    icon: jiraLogo 
-  },
-  { 
-    id: 'feature-flags' as TabType, 
-    label: 'Feature Flags', 
-    icon: unleashIcon
+// Helper to get primary tab from secondary tab
+const getPrimaryFromSecondary = (tab: TabType): PrimaryTabType => {
+  for (const [primary, tabs] of Object.entries(secondaryTabConfig)) {
+    if (tabs.some(t => t.id === tab)) {
+      return primary as PrimaryTabType;
+    }
   }
-];
+  return 'jira'; // fallback
+};
+
+// All valid secondary tabs
+const allSecondaryTabs = Object.values(secondaryTabConfig).flat();
+const isValidTab = (value: string): value is TabType => {
+  return allSecondaryTabs.some(t => t.id === value);
+};
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>(() => {
     try {
       const stored = localStorage.getItem(TAB_STORAGE_KEY);
       if (stored && isValidTab(stored)) {
-        return { currentTab: stored as TabType };
+        const tab = stored as TabType;
+        return { 
+          currentTab: tab,
+          primaryTab: getPrimaryFromSecondary(tab)
+        };
       }
     } catch {
       // ignore storage errors and fall back to default
     }
-    return { currentTab: 'my-sprint-jiras' };
+    return { currentTab: 'my-sprint-jiras', primaryTab: 'jira' };
   });
 
   // First-run identity check
@@ -81,10 +96,26 @@ export default function App() {
     setShowFirstRun(false);
   };
 
-  const handleTabChange = (tab: TabType) => {
+  // Handle primary tab change - switch to first secondary tab of that primary
+  const handlePrimaryTabChange = (primary: PrimaryTabType) => {
+    const firstSecondary = secondaryTabConfig[primary][0].id;
     setAppState({
-      currentTab: tab
+      primaryTab: primary,
+      currentTab: firstSecondary
     });
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, firstSecondary);
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  // Handle secondary tab change
+  const handleSecondaryTabChange = (tab: TabType) => {
+    setAppState(prev => ({
+      ...prev,
+      currentTab: tab
+    }));
     try {
       localStorage.setItem(TAB_STORAGE_KEY, tab);
     } catch {
@@ -102,9 +133,12 @@ export default function App() {
       <SettingsProvider>
         <div className="app">
           <Header 
-            tabConfig={tabConfig}
-            currentTab={appState.currentTab}
-            onTabChange={handleTabChange}
+            primaryTabConfig={primaryTabConfig}
+            secondaryTabConfig={secondaryTabConfig}
+            currentPrimaryTab={appState.primaryTab}
+            currentSecondaryTab={appState.currentTab}
+            onPrimaryTabChange={handlePrimaryTabChange}
+            onSecondaryTabChange={handleSecondaryTabChange}
           />
           
           <SplitPanel

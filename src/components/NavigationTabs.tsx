@@ -1,47 +1,63 @@
 import React from 'react';
-import type { TabType } from '../App';
-
-interface TabConfig {
-  id: TabType;
-  label: string;
-  icon: string | null; // URL/path to image, or null for emoji
-  emoji?: string; // Optional emoji for tabs without icons
-}
+import type { TabType, PrimaryTabType } from '../App';
 
 interface NavigationTabsProps {
-  tabConfig: TabConfig[];
-  currentTab: TabType;
-  onTabChange: (tab: TabType) => void;
+  primaryTabConfig: Array<{
+    id: PrimaryTabType;
+    label: string;
+    icon: string;
+  }>;
+  secondaryTabConfig: Record<PrimaryTabType, Array<{ id: TabType; label: string; icon?: string }>>;
+  currentPrimaryTab: PrimaryTabType;
+  currentSecondaryTab: TabType;
+  onPrimaryTabChange: (tab: PrimaryTabType) => void;
+  onSecondaryTabChange: (tab: TabType) => void;
 }
 
 const NavigationTabs: React.FC<NavigationTabsProps> = ({
-  tabConfig,
-  currentTab,
-  onTabChange
+  primaryTabConfig,
+  secondaryTabConfig,
+  currentPrimaryTab,
+  currentSecondaryTab,
+  onPrimaryTabChange,
+  onSecondaryTabChange
 }) => {
   return (
-    <nav className="navigation">
-      {/* Single Row Navigation */}
-      <div className="secondary-tabs">
-        {tabConfig.map((tab) => (
-          <button
-            key={tab.id}
-            className={`secondary-tab ${currentTab === tab.id ? 'active' : ''}`}
-            onClick={() => onTabChange(tab.id)}
-          >
-            {tab.icon ? (
-              <img 
-                src={tab.icon} 
-                alt={tab.label} 
-                className={`tab-icon ${tab.id === 'my-code-reviews' || tab.id === 'my-prs' ? 'tab-icon-github' : ''}`} 
-              />
-            ) : tab.emoji ? (
-              <span className="tab-emoji">{tab.emoji}</span>
-            ) : null}
-            <span className="tab-label">{tab.label}</span>
-          </button>
-        ))}
-      </div>
+    <nav className="navigation navigation-inline">
+      {primaryTabConfig.map((primary, index) => {
+        const secondaryTabs = secondaryTabConfig[primary.id];
+        const isActive = currentPrimaryTab === primary.id;
+        
+        return (
+          <React.Fragment key={primary.id}>
+            {/* Divider between groups */}
+            {index > 0 && <span className="nav-divider">│</span>}
+            
+            <div className="nav-group">
+              {/* Primary tab button - always visible */}
+              <button
+                className={`nav-primary-tab ${isActive ? 'active' : ''}`}
+                onClick={() => onPrimaryTabChange(primary.id)}
+              >
+                <img src={primary.icon} alt={primary.label} className="nav-group-icon" />
+                {primary.label}
+              </button>
+              
+              {/* Subtabs - only show for active primary tab */}
+              {isActive && secondaryTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={`nav-tab ${currentSecondaryTab === tab.id ? 'active' : ''}`}
+                  onClick={() => onSecondaryTabChange(tab.id)}
+                >
+                  {tab.icon && <img src={tab.icon} alt="" className="nav-tab-icon" />}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </React.Fragment>
+        );
+      })}
     </nav>
   );
 };

@@ -87,12 +87,16 @@ Users only need to provide their **username** (GitHub) and **email** (JIRA) to f
 
 ### Navigation System
 - Single-row header with logo, navigation tabs, timeboard, and settings
-- Five primary tabs:
-  1) My Sprint JIRAs
-  2) My Code Reviews
-  3) My PRs
-  4) JIRA Lookup
-  5) Feature Flags
+- **Two-level inline grouped navigation**:
+  - **Primary tabs**: JIRA, GitHub, Other (clickable category selectors)
+  - **Secondary tabs**: Appear inline next to active primary tab
+  - Layout: `🎫 JIRA [My Sprint JIRAs] [JIRA Lookup]  │  🐙 GitHub  │  ••• Other`
+- Tab structure:
+  | Primary | Secondary Tabs |
+  |---------|----------------|
+  | JIRA | My Sprint JIRAs, JIRA Lookup |
+  | GitHub | My Code Reviews, My PRs |
+  | Other | 🚩 Feature Flags |
 - Team Timeboard: Globe button opens team timezone dashboard
 
 ### Core Panels
