@@ -1,12 +1,80 @@
 import express from 'express';
 import path from 'path';
 import https from 'https';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3017;
+
+// ============================================================================
+// TEAM ROSTER PERSISTENCE (Phase 4)
+// ============================================================================
+
+// Data directory for persistent storage (PVC mount in OpenShift, local dir otherwise)
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../data');
+const MEMBERS_FILE = path.join(DATA_DIR, 'members.json');
+const SEED_FILE = path.join(__dirname, '../public/timeboard/members.json');
+
+// Ensure data directory exists
+const ensureDataDir = () => {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    console.log(`📁 Created data directory: ${DATA_DIR}`);
+  }
+};
+
+// Load members from persistent storage (or seed from public/timeboard/members.json)
+const loadMembersFromDisk = () => {
+  ensureDataDir();
+  
+  // If persistent file exists, use it
+  if (fs.existsSync(MEMBERS_FILE)) {
+    try {
+      const data = fs.readFileSync(MEMBERS_FILE, 'utf8');
+      const members = JSON.parse(data);
+      console.log(`👥 Loaded ${members.length} team members from ${MEMBERS_FILE}`);
+      return members;
+    } catch (err) {
+      console.error(`❌ Failed to load members from ${MEMBERS_FILE}:`, err.message);
+    }
+  }
+  
+  // Otherwise, seed from public/timeboard/members.json
+  if (fs.existsSync(SEED_FILE)) {
+    try {
+      const data = fs.readFileSync(SEED_FILE, 'utf8');
+      const members = JSON.parse(data);
+      // Save to persistent storage
+      saveMembersToDisk(members);
+      console.log(`🌱 Seeded ${members.length} team members from ${SEED_FILE}`);
+      return members;
+    } catch (err) {
+      console.error(`❌ Failed to seed members from ${SEED_FILE}:`, err.message);
+    }
+  }
+  
+  console.log('⚠️ No members data found, starting with empty roster');
+  return [];
+};
+
+// Save members to persistent storage
+const saveMembersToDisk = (members) => {
+  ensureDataDir();
+  try {
+    fs.writeFileSync(MEMBERS_FILE, JSON.stringify(members, null, 2), 'utf8');
+    console.log(`💾 Saved ${members.length} team members to ${MEMBERS_FILE}`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Failed to save members to ${MEMBERS_FILE}:`, err.message);
+    return false;
+  }
+};
+
+// In-memory cache of members (loaded on startup)
+let membersCache = loadMembersFromDisk();
 
 // Middleware
 app.use(express.json());
@@ -24,6 +92,124 @@ app.use('/api', (req, res, next) => {
         next();
     }
 });
+
+// ============================================================================
+// TEAM ROSTER API ENDPOINTS
+// ============================================================================
+
+// GET /api/team/members - Get all team members
+app.get('/api/team/members', (req, res) => {
+  res.json({
+    success: true,
+    members: membersCache,
+    source: fs.existsSync(MEMBERS_FILE) ? 'persistent' : 'memory'
+  });
+});
+
+// POST /api/team/members - Add a new member
+app.post('/api/team/members', (req, res) => {
+  const { name, role, tz, github, jira } = req.body;
+  
+  if (!name || !role || !tz) {
+    return res.status(400).json({ error: 'name, role, and tz are required' });
+  }
+  
+  // Check for duplicate name
+  if (membersCache.some(m => m.name === name)) {
+    return res.status(409).json({ error: `Member "${name}" already exists` });
+  }
+  
+  const newMember = {
+    name: name.trim(),
+    role: role.trim(),
+    tz: tz.trim(),
+    ...(github && { github: github.trim() }),
+    ...(jira && { jira: jira.trim() })
+  };
+  
+  membersCache.unshift(newMember); // Add to beginning
+  
+  if (saveMembersToDisk(membersCache)) {
+    res.status(201).json({ success: true, member: newMember });
+  } else {
+    res.status(500).json({ error: 'Failed to persist member' });
+  }
+});
+
+// PUT /api/team/members/:name - Update a member by name
+app.put('/api/team/members/:name', (req, res) => {
+  const memberName = decodeURIComponent(req.params.name);
+  const { name, role, tz, github, jira } = req.body;
+  
+  const index = membersCache.findIndex(m => m.name === memberName);
+  if (index === -1) {
+    return res.status(404).json({ error: `Member "${memberName}" not found` });
+  }
+  
+  // If renaming, check for duplicate
+  if (name && name !== memberName && membersCache.some(m => m.name === name)) {
+    return res.status(409).json({ error: `Member "${name}" already exists` });
+  }
+  
+  const updatedMember = {
+    name: (name || memberName).trim(),
+    role: (role || membersCache[index].role).trim(),
+    tz: (tz || membersCache[index].tz).trim(),
+    ...(github !== undefined ? (github ? { github: github.trim() } : {}) : (membersCache[index].github ? { github: membersCache[index].github } : {})),
+    ...(jira !== undefined ? (jira ? { jira: jira.trim() } : {}) : (membersCache[index].jira ? { jira: membersCache[index].jira } : {}))
+  };
+  
+  membersCache[index] = updatedMember;
+  
+  if (saveMembersToDisk(membersCache)) {
+    res.json({ success: true, member: updatedMember });
+  } else {
+    res.status(500).json({ error: 'Failed to persist member update' });
+  }
+});
+
+// DELETE /api/team/members/:name - Delete a member by name
+app.delete('/api/team/members/:name', (req, res) => {
+  const memberName = decodeURIComponent(req.params.name);
+  
+  const index = membersCache.findIndex(m => m.name === memberName);
+  if (index === -1) {
+    return res.status(404).json({ error: `Member "${memberName}" not found` });
+  }
+  
+  const deleted = membersCache.splice(index, 1)[0];
+  
+  if (saveMembersToDisk(membersCache)) {
+    res.json({ success: true, deleted: deleted });
+  } else {
+    res.status(500).json({ error: 'Failed to persist member deletion' });
+  }
+});
+
+// POST /api/team/members/reload - Reload from seed file (admin action)
+app.post('/api/team/members/reload', (req, res) => {
+  if (!fs.existsSync(SEED_FILE)) {
+    return res.status(404).json({ error: 'Seed file not found' });
+  }
+  
+  try {
+    const data = fs.readFileSync(SEED_FILE, 'utf8');
+    const members = JSON.parse(data);
+    membersCache = members;
+    
+    if (saveMembersToDisk(membersCache)) {
+      res.json({ success: true, members: membersCache, message: `Reloaded ${members.length} members from seed` });
+    } else {
+      res.status(500).json({ error: 'Failed to persist reloaded members' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reload seed file', details: err.message });
+  }
+});
+
+// ============================================================================
+// JIRA API ENDPOINTS
+// ============================================================================
 
 // Server-side JIRA token (loaded from environment variable)
 const JIRA_TOKEN = process.env.JIRA_TOKEN;

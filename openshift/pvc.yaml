@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ocmui-dashboard-data
+  labels:
+    app: ocmui-team-dashboard
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi  # Small - just storing team roster JSON
+  storageClassName: gp3-csi  # ROSA HCP default storage class

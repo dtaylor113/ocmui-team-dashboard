@@ -8,8 +8,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - route.yaml
-  # Uncomment for Phase 3 when using server-side tokens:
-  # - secrets.yaml
+  - pvc.yaml  # Phase 4: Persistent storage for team roster
 
 commonLabels:
   app.kubernetes.io/name: ocmui-team-dashboard

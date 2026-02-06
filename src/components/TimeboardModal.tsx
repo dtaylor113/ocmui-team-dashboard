@@ -88,12 +88,35 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
 
   const loadMembers = async () => {
     try {
-      // First try localStorage for user modifications
+      // Try server API first (Phase 4 - shared roster)
+      const response = await fetch('/api/team/members');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.members)) {
+          const cleaned = data.members
+            .map((m: any) => ({ 
+              name: m.name, 
+              role: m.role, 
+              tz: m.tz,
+              github: m.github || undefined,
+              jira: m.jira || undefined
+            }))
+            .filter((m: any) => isValidTimezone(m.tz));
+          setMembers(cleaned);
+          console.log(`🕐 Loaded ${cleaned.length} team members from server (${data.source})`);
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('🕐 Server API not available, falling back to local storage:', error);
+    }
+    
+    // Fallback: try localStorage for local development
+    try {
       const stored = localStorage.getItem('ocmui_timeboard_members');
       if (stored) {
         const customMembers = JSON.parse(stored);
         if (customMembers && customMembers.length > 0) {
-          // Preserve github/jira identity fields along with core fields
           const cleaned = customMembers
             .map((m: any) => ({ 
               name: m.name, 
@@ -102,7 +125,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
               github: m.github || undefined,
               jira: m.jira || undefined
             }))
-            .filter((m: any) => isValidTimezone(m.tz)); // guard invalid tz from previous saves
+            .filter((m: any) => isValidTimezone(m.tz));
           setMembers(cleaned);
           console.log(`🕐 Loaded ${customMembers.length} team members from localStorage`);
           return;
@@ -130,9 +153,73 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const saveMembers = async (newMembers: TeamMember[]) => {
+  // Add a member via API (or localStorage fallback)
+  const addMemberApi = async (member: TeamMember): Promise<boolean> => {
     try {
-      // Filter out any invalid timezones before persisting
+      const response = await fetch('/api/team/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(member)
+      });
+      if (response.ok) {
+        console.log(`✅ Added member ${member.name} via API`);
+        return true;
+      }
+      const error = await response.json();
+      console.error('❌ Failed to add member:', error);
+      if (response.status === 409) {
+        alert(`Member "${member.name}" already exists`);
+      }
+      return false;
+    } catch (error) {
+      console.warn('🕐 API not available, using localStorage fallback');
+      return false;
+    }
+  };
+
+  // Update a member via API (or localStorage fallback)
+  const updateMemberApi = async (originalName: string, member: TeamMember): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/team/members/${encodeURIComponent(originalName)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(member)
+      });
+      if (response.ok) {
+        console.log(`✅ Updated member ${member.name} via API`);
+        return true;
+      }
+      const error = await response.json();
+      console.error('❌ Failed to update member:', error);
+      return false;
+    } catch (error) {
+      console.warn('🕐 API not available, using localStorage fallback');
+      return false;
+    }
+  };
+
+  // Delete a member via API (or localStorage fallback)
+  const deleteMemberApi = async (name: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/team/members/${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        console.log(`✅ Deleted member ${name} via API`);
+        return true;
+      }
+      const error = await response.json();
+      console.error('❌ Failed to delete member:', error);
+      return false;
+    } catch (error) {
+      console.warn('🕐 API not available, using localStorage fallback');
+      return false;
+    }
+  };
+
+  // localStorage fallback for saving all members
+  const saveMembersLocal = (newMembers: TeamMember[]) => {
+    try {
       const sanitized = newMembers.filter(m => isValidTimezone(m.tz));
       localStorage.setItem('ocmui_timeboard_members', JSON.stringify(sanitized));
       console.log(`🕐 Saved ${newMembers.length} team members to localStorage`);
@@ -350,11 +437,6 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const startAdd = () => {
-    setEditingIndex(-1);
-    setDraftMember({ name: '', role: '', tz: refTz || 'America/New_York', github: '', jira: '' });
-  };
-
   // Identity selection functions
   const handleIdentityButtonClick = () => {
     setShowIdentitySelection(!showIdentitySelection);
@@ -410,10 +492,19 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   };
 
   const deleteMember = async (index: number) => {
-    if (confirm(`Delete ${members[index].name}?`)) {
-      const newMembers = [...members];
-      newMembers.splice(index, 1);
-      await saveMembers(newMembers);
+    const memberName = members[index].name;
+    if (confirm(`Delete ${memberName}?`)) {
+      // Try API first
+      const apiSuccess = await deleteMemberApi(memberName);
+      if (apiSuccess) {
+        // Reload from server to get updated list
+        await loadMembers();
+      } else {
+        // Fallback to localStorage
+        const newMembers = [...members];
+        newMembers.splice(index, 1);
+        saveMembersLocal(newMembers);
+      }
     }
   };
 
@@ -439,47 +530,35 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       github: github?.trim() || undefined,
       jira: jira?.trim() || undefined
     };
-    let newMembers = [...members];
+    
     if (editingIndex === -1) {
-      newMembers.unshift(trimmed);
+      // Adding new member
+      const apiSuccess = await addMemberApi(trimmed);
+      if (apiSuccess) {
+        await loadMembers(); // Reload from server
+      } else {
+        // Fallback to localStorage
+        const newMembers = [trimmed, ...members];
+        saveMembersLocal(newMembers);
+      }
     } else if (editingIndex !== null && editingIndex >= 0) {
-      newMembers[editingIndex] = trimmed;
+      // Updating existing member
+      const originalName = members[editingIndex].name;
+      const apiSuccess = await updateMemberApi(originalName, trimmed);
+      if (apiSuccess) {
+        await loadMembers(); // Reload from server
+      } else {
+        // Fallback to localStorage
+        const newMembers = [...members];
+        newMembers[editingIndex] = trimmed;
+        saveMembersLocal(newMembers);
+      }
     }
-    await saveMembers(newMembers);
     cancelEdit();
   };
 
-  // Export/Reload actions
-  const exportMembersToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(members, null, 2));
-      alert('Members copied to clipboard as JSON');
-    } catch (e) {
-      console.error('Failed to copy members JSON:', e);
-      alert('Failed to copy to clipboard');
-    }
-  };
-
-  const reloadMembersJson = async () => {
-    if (!confirm('Reload from Public/timeboard/members.json and overwrite browser cookies/localStorage?')) return;
-    try {
-      const response = await fetch('/timeboard/members.json');
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const cleaned = (Array.isArray(data) ? data : []).map((m: any) => ({ 
-        name: m.name, 
-        role: m.role, 
-        tz: m.tz,
-        github: m.github || undefined,
-        jira: m.jira || undefined
-      }));
-      await saveMembers(cleaned);
-      console.log('Reloaded /timeboard/members.json into localStorage');
-    } catch (e) {
-      console.error('Failed to reload members.json:', e);
-      alert('Failed to reload members.json');
-    }
-  };
+  // Note: Export, Reload, and Add buttons removed for security (Phase 4)
+  // Admin roster management is done via oc CLI or git seed file
 
   // (Removed legacy timezoneOptions; using allTimezones instead)
 
@@ -534,7 +613,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
             
-            {/* Right side: Identity + Export/Reload + Add */}
+            {/* Right side: Identity + Refresh */}
             <div className="timeboard-right-controls">
               <button 
                 className={getIdentityButtonClass()}
@@ -547,26 +626,10 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
 
               <button
                 className="timeboard-btn timeboard-btn-small"
-                title="Export Members (Copy JSON)"
-                onClick={exportMembersToClipboard}
+                title="Refresh team roster from server"
+                onClick={loadMembers}
               >
-                ⬆️ Export
-              </button>
-
-              <button
-                className="timeboard-btn timeboard-btn-small"
-                title="Reload members.json"
-                onClick={reloadMembersJson}
-              >
-                🔄 Reload members.json
-              </button>
-
-              <button
-                className="timeboard-btn timeboard-btn-small"
-                title="Add member"
-                onClick={startAdd}
-              >
-                ➕ Add
+                🔄 Refresh
               </button>
             </div>
           </div>
@@ -616,88 +679,14 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
             <thead>
               <tr>
                 {showIdentitySelection && <th style={{width: '5%'}}></th>}
-                <th style={{width: '20%'}}>Name</th>
-                <th style={{width: '10%'}}>Role</th>
-                <th style={{width: showIdentitySelection ? '22%' : '24%'}}>IANA TZ</th>
-                <th style={{width: '12%'}}>Local Time</th>
-                <th style={{width: '9%'}}>Offset</th>
-                <th style={{width: '11%'}}>Actions</th>
+                <th style={{width: '22%'}}>Name</th>
+                <th style={{width: '12%'}}>Role</th>
+                <th style={{width: showIdentitySelection ? '28%' : '30%'}}>IANA TZ</th>
+                <th style={{width: '14%'}}>Local Time</th>
+                <th style={{width: '10%'}}>Offset</th>
               </tr>
             </thead>
             <tbody>
-              {/* New member inline row */}
-              {editingIndex === -1 && (
-                <>
-                  <tr key="new-member-row">
-                    {showIdentitySelection && <td></td>}
-                    <td style={{ width: '20%' }}>
-                      <input
-                        type="text"
-                        placeholder="Name"
-                        value={draftMember.name}
-                        onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
-                        style={{ padding: '4px 6px', width: '120px', minWidth: '120px', maxWidth: '120px', display: 'inline-block' }}
-                        maxLength={25}
-                      />
-                    </td>
-                    <td style={{ width: '10%' }}>
-                      <input
-                        type="text"
-                        placeholder="Role"
-                        value={draftMember.role}
-                        onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
-                        style={{ padding: '4px 6px', width: '80px', minWidth: '80px', maxWidth: '80px', display: 'inline-block' }}
-                        maxLength={25}
-                      />
-                    </td>
-                    <td>
-                      <select
-                        value={draftMember.tz}
-                        onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
-                      >
-                        <option value="">Select timezone…</option>
-                        {tzWithSort.map(tz => (
-                          <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="mono" colSpan={2}>—</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="timeboard-btn timeboard-btn-primary timeboard-btn-small" onClick={saveDraft}>Save</button>
-                        <button className="timeboard-btn timeboard-btn-secondary timeboard-btn-small" onClick={cancelEdit}>Cancel</button>
-                      </div>
-                    </td>
-                  </tr>
-                  {/* Identity fields row */}
-                  <tr key="new-member-identity-row" className="identity-fields-row">
-                    {showIdentitySelection && <td></td>}
-                    <td colSpan={5} style={{ paddingTop: 0, paddingBottom: 8 }}>
-                      <div style={{ display: 'flex', gap: 16, alignItems: 'center', fontSize: 12, color: '#9ca3af' }}>
-                        <span>Identity (optional):</span>
-                        <input
-                          type="text"
-                          placeholder="GitHub username"
-                          value={draftMember.github || ''}
-                          onChange={(e) => setDraftMember(prev => ({ ...prev, github: e.target.value }))}
-                          style={{ padding: '3px 6px', width: '120px', fontSize: 12 }}
-                          maxLength={40}
-                        />
-                        <input
-                          type="text"
-                          placeholder="JIRA email"
-                          value={draftMember.jira || ''}
-                          onChange={(e) => setDraftMember(prev => ({ ...prev, jira: e.target.value }))}
-                          style={{ padding: '3px 6px', width: '180px', fontSize: 12 }}
-                          maxLength={60}
-                        />
-                      </div>
-                    </td>
-                    <td></td>
-                  </tr>
-                </>
-              )}
-
               {displayMembers.map((member) => (
                 <tr 
                   key={`${member.name}-${member.tz}`}
@@ -720,66 +709,74 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                     const isEditing = editingIndex === idx;
                     if (isEditing) {
                       return (
-                        <>
-                          <td style={{ width: '20%' }}>
-                            <input
-                              type="text"
-                              value={draftMember.name}
-                              onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
-                              style={{ padding: '4px 6px', width: '120px', minWidth: '120px', maxWidth: '120px', display: 'inline-block' }}
-                              maxLength={25}
-                            />
-                            <div style={{ marginTop: 4 }}>
+                        <td colSpan={showIdentitySelection ? 6 : 5} style={{ padding: '12px 16px', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: '4px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', alignItems: 'end' }}>
+                            {/* Name */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Name</label>
                               <input
                                 type="text"
-                                placeholder="GitHub"
+                                value={draftMember.name}
+                                onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
+                                style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                                maxLength={25}
+                              />
+                            </div>
+                            {/* Role */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Role</label>
+                              <input
+                                type="text"
+                                value={draftMember.role}
+                                onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
+                                style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                                maxLength={25}
+                              />
+                            </div>
+                            {/* Timezone */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Timezone</label>
+                              <select
+                                value={draftMember.tz}
+                                onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
+                                style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                              >
+                                {tzWithSort.map(tz => (
+                                  <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {/* GitHub Username */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>GitHub username</label>
+                              <input
+                                type="text"
+                                placeholder="e.g., octocat"
                                 value={draftMember.github || ''}
                                 onChange={(e) => setDraftMember(prev => ({ ...prev, github: e.target.value }))}
-                                style={{ padding: '2px 4px', width: '100px', fontSize: 11, color: '#9ca3af' }}
+                                style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
                                 maxLength={40}
-                                title="GitHub username for identity"
                               />
                             </div>
-                          </td>
-                          <td style={{ width: '10%' }}>
-                            <input
-                              type="text"
-                              value={draftMember.role}
-                              onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
-                              style={{ padding: '4px 6px', width: '80px', minWidth: '80px', maxWidth: '80px', display: 'inline-block' }}
-                              maxLength={25}
-                            />
-                            <div style={{ marginTop: 4 }}>
+                            {/* JIRA Email */}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>JIRA email</label>
                               <input
-                                type="text"
-                                placeholder="JIRA email"
+                                type="email"
+                                placeholder="e.g., user@redhat.com"
                                 value={draftMember.jira || ''}
                                 onChange={(e) => setDraftMember(prev => ({ ...prev, jira: e.target.value }))}
-                                style={{ padding: '2px 4px', width: '140px', fontSize: 11, color: '#9ca3af' }}
+                                style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
                                 maxLength={60}
-                                title="JIRA email for identity"
                               />
                             </div>
-                          </td>
-                          <td>
-                            <select
-                              value={draftMember.tz}
-                              onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
-                            >
-                              {tzWithSort.map(tz => (
-                                <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="mono">—</td>
-                          <td className="mono">—</td>
-                          <td>
-                            <div style={{ display: 'flex', gap: 6 }}>
+                            {/* Action Buttons */}
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'end', paddingBottom: 2 }}>
                               <button className="timeboard-btn timeboard-btn-primary timeboard-btn-small" onClick={saveDraft}>Save</button>
                               <button className="timeboard-btn timeboard-btn-secondary timeboard-btn-small" onClick={cancelEdit}>Cancel</button>
                             </div>
-                          </td>
-                        </>
+                          </div>
+                        </td>
                       );
                     }
                     return (

@@ -34,7 +34,23 @@ const FirstRunIdentityModal: React.FC<FirstRunIdentityModalProps> = ({ isOpen, o
   const loadMembers = async () => {
     setLoading(true);
     try {
-      // First try localStorage
+      // Try server API first (Phase 4 - shared roster)
+      const apiResponse = await fetch('/api/team/members');
+      if (apiResponse.ok) {
+        const data = await apiResponse.json();
+        if (data.success && Array.isArray(data.members)) {
+          setMembers(data.members);
+          console.log(`👥 Loaded ${data.members.length} team members from server (${data.source})`);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('API not available, falling back to local storage:', error);
+    }
+    
+    // Fallback: try localStorage
+    try {
       const stored = localStorage.getItem('ocmui_timeboard_members');
       if (stored) {
         const customMembers = JSON.parse(stored);
@@ -141,7 +157,31 @@ const FirstRunIdentityModal: React.FC<FirstRunIdentityModalProps> = ({ isOpen, o
       jira: newMember.jira?.trim() || undefined
     };
 
-    // Add to members list and save
+    // Try server API first (Phase 4)
+    try {
+      const response = await fetch('/api/team/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trimmedMember)
+      });
+      if (response.ok) {
+        console.log(`✅ Added member ${trimmedMember.name} via API`);
+        // Reload members from server
+        await loadMembers();
+        // Select the new member
+        setSelectedMember(trimmedMember);
+        setIsAddingNew(false);
+        return;
+      }
+      if (response.status === 409) {
+        alert(`Member "${trimmedMember.name}" already exists`);
+        return;
+      }
+    } catch (error) {
+      console.warn('API not available, using localStorage fallback');
+    }
+
+    // Fallback: save to localStorage
     const updatedMembers = [trimmedMember, ...members];
     setMembers(updatedMembers);
     localStorage.setItem('ocmui_timeboard_members', JSON.stringify(updatedMembers));

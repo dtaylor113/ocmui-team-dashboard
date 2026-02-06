@@ -120,7 +120,54 @@ GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
 - **Multi-timezone Support**: View all team members' local times
 - **Business Hours Detection**: Visual indicators for off-hours
 - **Identity Selection**: "I am..." feature for easy timezone setup
-- **Reference Time Mode**: Choose a time (09:00–17:00, 30‑min steps) and TZ to compare teammates’ local times; TZ dropdown can be sorted alphabetically or by GMT offset; all renders use IANA rules for correct DST handling
+- **Reference Time Mode**: Choose a time (09:00–17:00, 30‑min steps) and TZ to compare teammates' local times; TZ dropdown can be sorted alphabetically or by GMT offset; all renders use IANA rules for correct DST handling
+- **Shared Roster**: Team roster is stored server-side (PVC) and shared across all users
+
+## 👤 Admin: Managing the Team Roster
+
+The team roster is shared across all users and stored on the server. Regular users can view the roster and identify themselves, but adding/editing/deleting members requires admin access.
+
+### Option 1: Edit directly on the server (OpenShift)
+
+```bash
+# SSH into the running pod
+oc rsh deployment/ocmui-team-dashboard
+
+# Edit the data file
+vi /data/members.json
+
+# Changes take effect immediately (users can click Refresh in Timeboard)
+```
+
+### Option 2: Update via the seed file (Git)
+
+1. Edit `public/timeboard/members.json` in the repository
+2. Commit and push the changes
+3. Rebuild and redeploy the container
+4. The new roster will be loaded on first startup (if `/data/members.json` doesn't exist) or you can reset via API:
+   ```bash
+   curl -X POST https://YOUR_ROUTE/api/team/members/reload
+   ```
+
+### Roster Entry Format
+
+```json
+{
+  "name": "Jane Doe",
+  "role": "dev",
+  "tz": "America/New_York",
+  "github": "janedoe",
+  "jira": "jdoe@redhat.com"
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Display name |
+| `role` | Yes | Role (dev, qe, manager, etc.) |
+| `tz` | Yes | IANA timezone (e.g., `America/New_York`) |
+| `github` | No | GitHub username for PR filtering |
+| `jira` | No | JIRA email for ticket filtering |
 
 ## 🐛 Troubleshooting
 

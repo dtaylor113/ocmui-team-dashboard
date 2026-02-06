@@ -1,0 +1,93 @@
+[
+  {
+    "name": "Dylan Cooper",
+    "role": "dev",
+    "tz": "America/Denver",
+    "github": "DcooperRH",
+    "jira": "dcooper@redhat.com"
+  },
+  {
+    "name": "Zac Herman",
+    "role": "dev",
+    "tz": "America/Denver",
+    "github": "zherman0",
+    "jira": "zherman@redhat.com"
+  },
+  {
+    "name": "Dave Taylor",
+    "role": "team lead",
+    "tz": "America/New_York",
+    "github": "dtaylor113",
+    "jira": "dtaylor@redhat.com"
+  },
+  {
+    "name": "Trevor Hendricks",
+    "role": "dev",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Lakshmi Shivanthi",
+    "role": "qe dev",
+    "tz": "America/Los_Angeles"
+  },
+  {
+    "name": "Jason Loss",
+    "role": "qe dev",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Joseph Caiani",
+    "role": "manager",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Deepika Ramakrishnan",
+    "role": "sr. manager",
+    "tz": "America/New_York"
+  },
+  {
+    "name": "Roberto Emanuel",
+    "role": "architect",
+    "tz": "Europe/Rome"
+  },
+  {
+    "name": "Ales Pecha",
+    "role": "qe dev",
+    "tz": "Europe/Prague"
+  },
+  {
+    "name": "Denis Ragan",
+    "role": "qe dev",
+    "tz": "Europe/Berlin"
+  },
+  {
+    "name": "Eliran (Lyn) Malka",
+    "role": "dev",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Lior Keren",
+    "role": "dev",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Netta Meiri",
+    "role": "intern",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Liza Gilman",
+    "role": "dev",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Nir Farkas",
+    "role": "UX",
+    "tz": "Asia/Jerusalem"
+  },
+  {
+    "name": "Jaya Mekkattillan",
+    "role": "qe lead",
+    "tz": "Asia/Calcutta"
+  }
+]

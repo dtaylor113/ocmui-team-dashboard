@@ -126,6 +126,56 @@ curl -s https://YOUR_ROUTE/api/jira/status | jq .
 
 ---
 
+## Managing the Team Roster
+
+The team roster is stored in a PersistentVolumeClaim (PVC) at `/data/members.json` and is shared across all users.
+
+### View Current Roster
+
+```bash
+# SSH into the pod and view
+oc rsh deployment/ocmui-team-dashboard cat /data/members.json
+```
+
+### Add/Edit/Delete Members
+
+```bash
+# SSH into the pod
+oc rsh deployment/ocmui-team-dashboard
+
+# Edit the roster file
+vi /data/members.json
+
+# Changes take effect immediately - users can click "Refresh" in Timeboard
+```
+
+### Reset Roster from Seed File
+
+If you need to reset the roster to the original seed file (`public/timeboard/members.json`):
+
+```bash
+# Via API
+curl -X POST https://YOUR_ROUTE/api/team/members/reload
+
+# Or delete the data file and restart (will re-seed on startup)
+oc rsh deployment/ocmui-team-dashboard rm /data/members.json
+oc rollout restart deployment/ocmui-team-dashboard
+```
+
+### Roster Entry Format
+
+```json
+{
+  "name": "Jane Doe",
+  "role": "dev",
+  "tz": "America/New_York",
+  "github": "janedoe",
+  "jira": "jdoe@redhat.com"
+}
+```
+
+---
+
 ## Troubleshooting
 
 ### Check Pod Status
