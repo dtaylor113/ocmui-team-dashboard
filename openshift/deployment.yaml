@@ -37,9 +37,35 @@ spec:
                 secretKeyRef:
                   name: ocmui-dashboard-tokens
                   key: jira-token
+            # Feature Flags: Unleash API tokens
+            - name: UNLEASH_STAGING_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ocmui-dashboard-tokens
+                  key: unleash-staging-token
+                  optional: true
+            - name: UNLEASH_PROD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ocmui-dashboard-tokens
+                  key: unleash-prod-token
+                  optional: true
             # Phase 4: Persistent data directory for team roster
             - name: DATA_DIR
               value: "/data"
+            # Basic Auth protection (shared team credentials)
+            - name: DASHBOARD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: ocmui-dashboard-tokens
+                  key: dashboard-username
+                  optional: true
+            - name: DASHBOARD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ocmui-dashboard-tokens
+                  key: dashboard-password
+                  optional: true
           volumeMounts:
             - name: data-volume
               mountPath: /data
@@ -52,14 +78,14 @@ spec:
               cpu: "500m"
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 30
             timeoutSeconds: 3
           readinessProbe:
             httpGet:
-              path: /
+              path: /ready
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10

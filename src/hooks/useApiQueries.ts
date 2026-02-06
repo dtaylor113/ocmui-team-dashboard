@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -928,6 +929,17 @@ export const usePRConversation = (repoName: string, prNumber: number) => {
 
 // Helper hook to format last updated timestamp
 export const useLastUpdatedFormat = (dataUpdatedAt?: number) => {
+  const [, setTick] = useState(0);
+  
+  // Update every 10 seconds so the timestamp increments
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 10000); // 10 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+  
   if (!dataUpdatedAt) return 'Never';
 
   const now = Date.now();

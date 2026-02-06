@@ -303,12 +303,6 @@ const FirstRunIdentityModal: React.FC<FirstRunIdentityModalProps> = ({ isOpen, o
                         <span className="member-role">{member.role}</span>
                         <span className="member-tz">{member.tz}</span>
                       </div>
-                      {(member.github || member.jira) && (
-                        <div className="member-identity">
-                          {member.github && <span title="GitHub">🐙 {member.github}</span>}
-                          {member.jira && <span title="JIRA">📋 {member.jira}</span>}
-                        </div>
-                      )}
                     </div>
                   ))
                 )}

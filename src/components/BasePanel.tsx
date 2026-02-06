@@ -14,6 +14,8 @@ interface BasePanelProps {
   headerControls?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 const BasePanel: React.FC<BasePanelProps> = ({
@@ -29,7 +31,9 @@ const BasePanel: React.FC<BasePanelProps> = ({
   loadingMessage = 'Loading...',
   headerControls,
   children,
-  className = ''
+  className = '',
+  onRefresh,
+  isRefreshing = false
 }) => {
   const hasContent = React.Children.count(children) > 0;
 
@@ -41,12 +45,24 @@ const BasePanel: React.FC<BasePanelProps> = ({
           {title}
         </h3>
         {headerControls}
-        {lastUpdated && (
-          <span className="last-updated">
-            Last Updated: {lastUpdated}
-            {updateInterval && ` • updates every ${updateInterval}`}
-          </span>
-        )}
+        <div className="last-updated-container">
+          {lastUpdated && (
+            <span className="last-updated">
+              Last Updated: {lastUpdated}
+              {updateInterval && ` • updates every ${updateInterval}`}
+            </span>
+          )}
+          {onRefresh && (
+            <button 
+              className={`refresh-btn ${isRefreshing ? 'refreshing' : ''}`}
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              title="Refresh data"
+            >
+              🔄
+            </button>
+          )}
+        </div>
       </div>
       
       <div className="panel-body">

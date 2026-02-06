@@ -58,15 +58,21 @@ server/index.js (ESM)
 - GET  /api/github/repos/:owner/:repo/pulls/:number/requested_reviewers
 - GET  /api/github/repos/:owner/:repo/issues/:number/comments
 - GET  /api/github/repos/:owner/:repo/commits/:ref/status    # CI status
+
+# Unleash Proxy Endpoints (use UNLEASH_STAGING_TOKEN, UNLEASH_PROD_TOKEN env vars)
+- GET  /api/unleash/status                                   # Check if Unleash tokens are configured
+- POST /api/unleash/flags                                    # Fetch and compare feature flags from staging/prod
 ```
 
 The server is implemented with **ES modules** (import/export) and serves the built React app from `dist/`. 
 
-#### Server-Side Tokens (Phase 3 - Current)
+#### Server-Side Tokens (Phase 3+ - Current)
 
-Both GitHub and JIRA tokens are now provided by the server via environment variables:
+All API tokens are provided by the server via environment variables:
 - `GITHUB_TOKEN` - GitHub personal access token (service account)
 - `JIRA_TOKEN` - JIRA personal access token (service account)
+- `UNLEASH_STAGING_TOKEN` - Unleash staging API token
+- `UNLEASH_PROD_TOKEN` - Unleash production API token
 
 Users only need to provide their **username** (GitHub) and **email** (JIRA) to filter results for themselves.
 
@@ -81,19 +87,21 @@ Users only need to provide their **username** (GitHub) and **email** (JIRA) to f
 
 ### Navigation System
 - Single-row header with logo, navigation tabs, timeboard, and settings
-- Four primary tabs:
+- Five primary tabs:
   1) My Sprint JIRAs
   2) My Code Reviews
   3) My PRs
   4) JIRA Lookup
+  5) Feature Flags
 - Team Timeboard: Globe button opens team timezone dashboard
 
 ### Core Panels
-- **My Sprint JIRAs**: All tickets for current sprint; sorted by last update
+- **My Sprint JIRAs**: All tickets for current sprint; sorted by last update; refresh button
 - **JIRA Lookup**: Prefix + number input, recent history, instant associated PRs
-- **My Code Reviews**: PRs requesting your review; reviewer comments modal
-- **My PRs**: Open/closed toggle, associated JIRA detection, status badges
+- **My Code Reviews**: PRs requesting your review; reviewer comments modal; refresh button
+- **My PRs**: Open/closed toggle, associated JIRA detection, status badges; refresh button
 - **Associated Panels (Right Side)**: Linked PRs for a JIRA; linked JIRAs for a PR
+- **Feature Flags**: Unleash dashboard comparing staging vs production; summary cards; search/filter; expandable descriptions
 
 ### Advanced Components
 - **JiraCard**: Atlassian Document Format rendering; inline images; collapsible sections; status (filled Atlassian colors), type & priority (black with colored borders and icons); Comments title with superscript new/edited badge; comments sorted by recent activity and labeled “(edited)” when applicable
@@ -169,6 +177,11 @@ GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
   - Clears all localStorage data (tokens, preferences, identity)
   - Reloads page to trigger first-run flow
   - Useful for testing or switching users
+- **App Security Info**: Settings modal includes "ⓘ App Security" button that opens a modal explaining:
+  - How tokens are stored (OpenShift Secrets, never in browser)
+  - Server-side API proxying (no direct client-to-external API calls)
+  - User identity handling (localStorage only, not transmitted)
+  - Network security (HTTPS/TLS)
 
 ### API Integration
 - **GitHub API**: Direct from frontend; multi-endpoint integration; robust error handling
@@ -297,6 +310,8 @@ yarn preview     # Preview production build
 |----------|----------|-------------|
 | `GITHUB_TOKEN` | Yes* | GitHub personal access token (service account) |
 | `JIRA_TOKEN` | Yes* | JIRA personal access token (service account) |
+| `UNLEASH_STAGING_TOKEN` | No | Unleash staging API token (for Feature Flags tab) |
+| `UNLEASH_PROD_TOKEN` | No | Unleash production API token (for Feature Flags tab) |
 | `PORT` | No | Server port (default: 3017 locally, 8080 in container) |
 
 *Required for full functionality. Without tokens, GitHub/JIRA features will show "service not configured" errors.

@@ -172,6 +172,48 @@ Current User Experience
 
 ---
 
+## Phase 5 – Feature Flags Dashboard ✅ COMPLETE
+
+Goal: Add a top-level "Feature Flags" tab to visualize Unleash feature flag states across environments.
+
+**Completed: February 6, 2026**
+
+What Was Implemented
+- Server-side Unleash proxy endpoints (`/api/unleash/status`, `/api/unleash/flags`)
+- New React component `FeatureFlagsPanel.tsx` with:
+  - Summary cards (Total, Prod ON, Not Released, Staging Only, Prod Only, Org Restricted)
+  - Clickable filters to narrow down flag list
+  - Searchable table with flag name, staging/prod status, strategy, last modified info
+  - Expandable descriptions
+- Unleash tokens stored in OpenShift Secret (`unleash-staging-token`, `unleash-prod-token`)
+- New tab icon using Unleash branding
+
+Current User Experience
+- ✅ Click "Feature Flags" tab to see all team feature flags
+- ✅ Summary cards show quick counts (mismatches, prod-on, etc.)
+- ✅ Click a summary card to filter the table
+- ✅ Search by flag name, author, or description
+- ✅ See who last modified each flag and when
+
+---
+
+## Phase 5.5 – UX Improvements ✅ COMPLETE
+
+Goal: Polish the user experience based on team feedback.
+
+**Completed: February 6, 2026**
+
+What Was Implemented
+- **Refresh Buttons**: Added to all main panels (My Sprint JIRAs, My Code Reviews, My PRs)
+  - Appears next to "Last Updated" timestamp
+  - Click to manually refresh data
+- **App Security Info**: New "ⓘ App Security" button in Settings modal
+  - Opens modal explaining security precautions (token storage, API proxying, data handling)
+- **Welcome Popup Icons**: Replaced emoji icons with proper GitHub/JIRA image assets
+- **Settings Button Layout**: Improved positioning of Log Out and Feedback buttons
+
+---
+
 ## Branching and Repos
 
 **Current approach** (simplified):
@@ -211,6 +253,8 @@ Notes
 - [x] Phase 2.5 Initial ROSA deployment live! 🎉
 - [x] Phase 3 server-side tokens - complete! 🔐
 - [x] Phase 4 shared roster persistence - complete! 👥
+- [x] Phase 5 feature flags dashboard - complete! 🚩
+- [x] Phase 5.5 UX improvements - complete! ✨
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
 
 
@@ -223,18 +267,24 @@ Use this section to quickly navigate the codebase and implement each phase.
 ### Core files by concern
 - Timeboard / Identity
   - `src/components/TimeboardModal.tsx`
-    - Loads members; inline add/edit/delete; “I am …” selection; persists `ocmui_selected_team_member` and updates timezone.
+    - Loads members; inline add/edit/delete; "I am …" selection; persists `ocmui_selected_team_member` and updates timezone.
 - Settings and Global Preferences
   - `src/contexts/SettingsContext.tsx`
     - Holds `apiTokens` and `userPreferences`; `isConfigured` calculation; persistence via localStorage.
   - `src/components/SettingsModal.tsx`
-    - UI for tokens and (to be) team actions; callsites for `testGithubToken`/`testJiraToken`.
+    - UI for tokens and team actions; Log Out button; App Security info modal.
 - API Queries
   - `src/hooks/useApiQueries.ts`
-    - All GitHub and JIRA data fetches; today GitHub calls hit public API with `Authorization` header; JIRA calls go through our Express proxy.
+    - All GitHub, JIRA, and Unleash data fetches; all calls go through Express proxy.
 - Server (Express)
   - `server/index.js`
-    - Serves built SPA; JIRA proxy endpoints; update `PORT` handling and add GitHub proxy routes in Phase 3.
+    - Serves built SPA; GitHub, JIRA, and Unleash proxy endpoints; team roster CRUD.
+- Feature Flags
+  - `src/components/FeatureFlagsPanel.tsx`
+    - Unleash dashboard with summary cards, search, and comparison table.
+- Shared UI Components
+  - `src/components/BasePanel.tsx`
+    - Reusable panel wrapper with header, loading states, and refresh button.
 
 ### Key localStorage keys
 - `ocmui_selected_team_member` – persisted identity: `{ name, tz, [github], [jira] }`
@@ -266,7 +316,7 @@ Use this section to quickly navigate the codebase and implement each phase.
 - Phase 3.5 (optional)
   - Add OAuth proxy sidecar to deployment for Red Hat SSO integration.
 
-### Endpoint inventory (Phase 3 - all server-side)
+### Endpoint inventory (Phase 3+ - all server-side)
 - Browser → Express (GitHub proxy)
   - GET `/api/github/status`
   - GET `/api/github/search/issues`
@@ -283,12 +333,17 @@ Use this section to quickly navigate the codebase and implement each phase.
   - POST `/api/jira-ticket`
   - POST `/api/jira-sprint-tickets`
   - POST `/api/jira-child-issues`
+- Browser → Express (Unleash proxy)
+  - GET `/api/unleash/status`
+  - POST `/api/unleash/flags`
 
 ### Environment variables (implemented)
 - `PORT` – web server port (OpenShift uses 8080, local default 3017)
 - `JIRA_BASE_URL` – e.g., `https://issues.redhat.com`
 - `JIRA_TOKEN` – service-account token for JIRA (stored in OpenShift Secret)
 - `GITHUB_TOKEN` – service-account token for GitHub (stored in OpenShift Secret)
+- `UNLEASH_STAGING_TOKEN` – Unleash staging API token (stored in OpenShift Secret)
+- `UNLEASH_PROD_TOKEN` – Unleash production API token (stored in OpenShift Secret)
 
 **Local development**: `GITHUB_TOKEN=xxx JIRA_TOKEN=xxx yarn start`
 

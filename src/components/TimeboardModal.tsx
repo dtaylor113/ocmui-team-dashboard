@@ -57,9 +57,12 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     loadMembers();
   }, []); // Only run once on mount, not when members change!
   
-  // Check for existing identity when members are loaded
+  // Check for existing identity when members are loaded or modal opens
   useEffect(() => {
     if (members.length === 0) return; // Wait for members to be loaded
+    
+    // Skip if identity already set
+    if (selectedIdentity) return;
     
     const storedMember = localStorage.getItem('ocmui_selected_team_member');
     if (storedMember) {
@@ -68,12 +71,13 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
         const member = members.find(m => m.name === memberData.name);
         if (member) {
           setSelectedIdentity(member);
+          console.log(`✅ Loaded identity from localStorage: ${member.name}`);
         }
       } catch (error) {
         console.error('Error parsing stored team member:', error);
       }
     }
-  }, [members]); // This one can depend on members since it doesn't fetch
+  }, [members, isOpen]); // Re-check when modal opens or members change
 
   // Auto-refresh current time every minute (only when modal is open and in 'now' mode)
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMySprintJiras, useLastUpdatedFormat } from '../hooks/useApiQueries';
 import { useSettings } from '../contexts/SettingsContext';
 import JiraCard from './JiraCard';
@@ -12,8 +12,15 @@ interface JiraPanelProps {
 const JiraPanel: React.FC<JiraPanelProps> = ({ onTicketSelect, selectedTicket }) => {
   const { isConfigured } = useSettings();
   const sprintJirasQuery = useMySprintJiras();
-  const { data, isLoading, error } = sprintJirasQuery;
+  const { data, isLoading, error, refetch, isFetching } = sprintJirasQuery;
   const lastUpdated = useLastUpdatedFormat(sprintJirasQuery.dataUpdatedAt);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+  };
 
   const handleTicketClick = (ticket: any) => {
     if (onTicketSelect) {
@@ -36,7 +43,17 @@ const JiraPanel: React.FC<JiraPanelProps> = ({ onTicketSelect, selectedTicket })
     <div className="panel-content">
       <div className="panel-header">
         <h3><img src={jiraLogo} alt="JIRA" className="panel-icon" /> I have {data?.total || 0} Sprint JIRAs</h3>
-        <span className="last-updated">Last Updated: {lastUpdated} • updates every 5 minutes</span>
+        <div className="last-updated-container">
+          <span className="last-updated">Last Updated: {lastUpdated} • updates every 5 minutes</span>
+          <button 
+            className={`refresh-btn ${isRefreshing || isFetching ? 'refreshing' : ''}`}
+            onClick={handleRefresh}
+            disabled={isRefreshing || isFetching}
+            title="Refresh data"
+          >
+            🔄
+          </button>
+        </div>
       </div>
       
       <div className="panel-body">

@@ -29,16 +29,19 @@
 2. **My Code Reviews** - PRs awaiting user review 
 3. **My PRs** - Personal PRs with open/closed filtering  
 4. **JIRA Lookup** - Search any JIRA ticket with history
+5. **Feature Flags** - Unleash feature flag dashboard comparing staging vs production
 
 ### Key Features
 - **Auto-Association**: Click any JIRA to see related PRs, or any PR to see related JIRAs
 - **Rich Markdown**: Full GitHub and JIRA markdown rendering with image support
-- **Smart Caching**: Background updates with React Query
+- **Smart Caching**: Background updates with React Query; manual refresh buttons on all panels
 - **Timezone Awareness**: All timestamps in your selected timezone (DST-aware via IANA timezones)
-- **Team Dashboard**: Inline add/edit/delete of members; identity selection (“I am …”); reference time mode; timezone dropdown labeled with current UTC offset and sortable by offset
+- **Team Dashboard**: Inline add/edit/delete of members; identity selection ("I am …"); reference time mode; timezone dropdown labeled with current UTC offset and sortable by offset
   - Reference Time input with 30‑minute steps (09:00–17:00) and TZ dropdown sortable alphabetically or by GMT offset
-- **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled “(edited)”
+- **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled "(edited)"
 - **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
+- **Feature Flags Dashboard**: Compare Unleash feature flags between staging and production environments
+- **App Security Info**: Click "ⓘ App Security" in Settings to see how your data is protected
 
 ## 🚀 Quick Start
 
@@ -75,10 +78,13 @@ The dashboard is deployed and ready to use:
 
 3. **Start the application**
    ```bash
-   # With service account tokens (full functionality)
+   # With all service account tokens (full functionality including Feature Flags)
+   GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx UNLEASH_STAGING_TOKEN=user:xxxx UNLEASH_PROD_TOKEN=user:xxxx yarn start
+
+   # Minimum tokens (GitHub + JIRA only, no Feature Flags tab)
    GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start
 
-   # Or without tokens (GitHub/JIRA features will be disabled)
+   # Or without tokens (GitHub/JIRA/Unleash features will be disabled)
    yarn start
    ```
    - Builds and serves the application at `http://localhost:3017`
@@ -97,8 +103,8 @@ The dashboard is deployed and ready to use:
 ## 🔧 Development (optional)
 
 ```bash
-# With hot reloading
-GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
+# With hot reloading (all features)
+GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx UNLEASH_STAGING_TOKEN=user:xxxx UNLEASH_PROD_TOKEN=user:xxxx yarn start:dev
 ```
 - **API Server**: `http://localhost:3017` (Express.js)
 - **React App**: `http://localhost:5174` (Vite HMR)
@@ -109,6 +115,8 @@ GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx yarn start:dev
 |----------|-------------|
 | `GITHUB_TOKEN` | GitHub personal access token (service account) |
 | `JIRA_TOKEN` | Red Hat JIRA personal access token |
+| `UNLEASH_STAGING_TOKEN` | Unleash staging API token (for Feature Flags tab) |
+| `UNLEASH_PROD_TOKEN` | Unleash production API token (for Feature Flags tab) |
 | `PORT` | Server port (default: 3017) |
 
 ## 🚢 Deploying to OpenShift

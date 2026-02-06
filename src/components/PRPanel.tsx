@@ -25,7 +25,14 @@ const PRPanel: React.FC<PRPanelProps> = ({ tabType, prStatus = 'open', onPrStatu
   const query = tabType === 'my-code-reviews' ? codeReviewsQuery : myPRsQuery;
   const lastUpdated = useLastUpdatedFormat(query.dataUpdatedAt);
   
-  const { data, isLoading, error } = query;
+  const { data, isLoading, error, refetch, isFetching } = query;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+  };
 
   // Prepare data for code reviews filtering and counts
   const allCodeReviewPRs = useMemo(() => (tabType === 'my-code-reviews' ? (data?.pullRequests || []) : []), [tabType, data]);
@@ -138,6 +145,8 @@ const PRPanel: React.FC<PRPanelProps> = ({ tabType, prStatus = 'open', onPrStatu
       emptyMessage={getEmptyMessage()}
       loadingMessage={getLoadingMessage()}
       headerControls={headerControls}
+      onRefresh={handleRefresh}
+      isRefreshing={isRefreshing || isFetching}
     >
       {filteredPRs.length ? (
         <div className="pr-cards-container">

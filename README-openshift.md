@@ -120,11 +120,22 @@ oc delete secret ocmui-dashboard-tokens
 
 oc create secret generic ocmui-dashboard-tokens \
   --from-literal=github-token='ghp_xxxxxxxxxxxxxxxxxxxx' \
-  --from-literal=jira-token='your-jira-personal-access-token'
+  --from-literal=jira-token='your-jira-personal-access-token' \
+  --from-literal=unleash-staging-token='user:xxxxxxxxx' \
+  --from-literal=unleash-prod-token='user:xxxxxxxxx'
 
 # Restart deployment to pick up new tokens
 oc rollout restart deployment/ocmui-team-dashboard
 ```
+
+### Token Reference
+
+| Token | Purpose | How to Obtain |
+|-------|---------|---------------|
+| `github-token` | GitHub API access | GitHub Settings → Developer settings → Personal access tokens |
+| `jira-token` | JIRA API access | issues.redhat.com → Profile → Personal Access Tokens |
+| `unleash-staging-token` | Unleash staging API | ocm-stage.unleash.devshift.net → Admin → API Access |
+| `unleash-prod-token` | Unleash production API | ocm.unleash.devshift.net → Admin → API Access |
 
 ### Verify Token Status
 
@@ -311,5 +322,7 @@ oc login <api-url> --username=cluster-admin --password=<generated-password>
 | `openshift/deployment.yaml` | Pod deployment configuration |
 | `openshift/service.yaml` | Internal ClusterIP service |
 | `openshift/route.yaml` | External HTTPS route |
-| `openshift/secrets.example.yaml` | Template for tokens |
+| `openshift/pvc.yaml` | PersistentVolumeClaim for team roster data |
+| `openshift/secrets.example.yaml` | Template for tokens (GitHub, JIRA, Unleash) |
 | `openshift/kustomization.yaml` | Kustomize configuration |
+| `deploy.sh` | Automated build and deploy script |

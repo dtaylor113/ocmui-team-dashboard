@@ -10,6 +10,50 @@ const app = express();
 const PORT = process.env.PORT || 3017;
 
 // ============================================================================
+// BASIC AUTH PROTECTION (optional - enabled when DASHBOARD_PASSWORD is set)
+// ============================================================================
+
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD;
+const DASHBOARD_USERNAME = process.env.DASHBOARD_USERNAME || 'ocmui'; // Default username
+
+if (DASHBOARD_PASSWORD) {
+  console.log('🔐 Basic Auth protection ENABLED');
+  
+  // HTTP Basic Auth middleware
+  app.use((req, res, next) => {
+    // Allow health checks without auth
+    if (req.path === '/health' || req.path === '/ready') {
+      return next();
+    }
+    
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="OCMUI Team Dashboard"');
+      return res.status(401).send('Authentication required');
+    }
+    
+    // Decode base64 credentials
+    const base64Credentials = authHeader.split(' ')[1];
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
+    const [username, password] = credentials.split(':');
+    
+    if (username === DASHBOARD_USERNAME && password === DASHBOARD_PASSWORD) {
+      return next();
+    }
+    
+    res.setHeader('WWW-Authenticate', 'Basic realm="OCMUI Team Dashboard"');
+    return res.status(401).send('Invalid credentials');
+  });
+} else {
+  console.log('⚠️  Basic Auth protection DISABLED (no DASHBOARD_PASSWORD set)');
+}
+
+// Health check endpoints (no auth required)
+app.get('/health', (req, res) => res.send('OK'));
+app.get('/ready', (req, res) => res.send('OK'));
+
+// ============================================================================
 // TEAM ROSTER PERSISTENCE (Phase 4)
 // ============================================================================
 
@@ -1123,6 +1167,434 @@ app.post('/api/jira-child-issues', async (req, res) => {
     }
 });
 
+
+// ============================================================================
+// UNLEASH FEATURE FLAGS API ENDPOINTS
+// ============================================================================
+
+// Server-side Unleash tokens (loaded from environment variables)
+const UNLEASH_STAGING_URL = process.env.UNLEASH_STAGING_URL || 'https://ocm-stage.unleash.devshift.net';
+const UNLEASH_PROD_URL = process.env.UNLEASH_PROD_URL || 'https://ocm.unleash.devshift.net';
+const UNLEASH_STAGING_TOKEN = process.env.UNLEASH_STAGING_TOKEN;
+const UNLEASH_PROD_TOKEN = process.env.UNLEASH_PROD_TOKEN;
+const UNLEASH_PROJECT = process.env.UNLEASH_PROJECT || 'default';
+
+// URL for the featureConstants.ts file that defines which flags are used in the OCMUI codebase
+const FEATURE_CONSTANTS_URL = process.env.FEATURE_CONSTANTS_URL || 
+    'https://raw.githubusercontent.com/RedHatInsights/uhc-portal/main/src/queries/featureGates/featureConstants.ts';
+
+// Cache for the feature constants (refresh every 5 minutes)
+let featureConstantsCache = { flags: null, lastFetch: 0 };
+const FEATURE_CONSTANTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Fetch and parse the featureConstants.ts file to get list of flags used in codebase
+const fetchFeatureConstants = async () => {
+    const now = Date.now();
+    if (featureConstantsCache.flags && (now - featureConstantsCache.lastFetch) < FEATURE_CONSTANTS_CACHE_TTL) {
+        return featureConstantsCache.flags;
+    }
+    
+    return new Promise((resolve, reject) => {
+        const url = new URL(FEATURE_CONSTANTS_URL);
+        const options = {
+            hostname: url.hostname,
+            path: url.pathname,
+            method: 'GET',
+            headers: {
+                'Accept': 'text/plain',
+                'User-Agent': 'OCMUI-Team-Dashboard'
+            }
+        };
+        
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', () => {
+                if (res.statusCode !== 200) {
+                    console.error(`Failed to fetch featureConstants.ts: ${res.statusCode}`);
+                    resolve(featureConstantsCache.flags || []); // Return cached or empty
+                    return;
+                }
+                
+                // Parse the TypeScript file to extract feature flag names
+                // Look for patterns like: export const X = 'flag-name';
+                const flagRegex = /export\s+const\s+\w+\s*=\s*['"]([^'"]+)['"]/g;
+                const flags = [];
+                let match;
+                while ((match = flagRegex.exec(data)) !== null) {
+                    flags.push(match[1]);
+                }
+                
+                console.log(`📋 Loaded ${flags.length} feature flags from featureConstants.ts`);
+                featureConstantsCache = { flags, lastFetch: now };
+                resolve(flags);
+            });
+        });
+        
+        req.on('error', (err) => {
+            console.error('Error fetching featureConstants.ts:', err.message);
+            resolve(featureConstantsCache.flags || []); // Return cached or empty
+        });
+        req.end();
+    });
+};
+
+// Helper function to make Unleash API requests
+const makeUnleashRequest = (baseUrl, token, endpoint) => {
+    return new Promise((resolve, reject) => {
+        const url = new URL(`/api${endpoint}`, baseUrl);
+        const options = {
+            hostname: url.hostname,
+            path: url.pathname + url.search,
+            method: 'GET',
+            headers: {
+                'Authorization': token,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        };
+        
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    resolve({ statusCode: res.statusCode, data: parsed });
+                } catch (e) {
+                    resolve({ statusCode: res.statusCode, data: data, error: e.message });
+                }
+            });
+        });
+        
+        req.on('error', reject);
+        req.end();
+    });
+};
+
+// Parse strategy to get human-readable info
+const parseStrategy = (strategy) => {
+    const result = {
+        name: strategy.name,
+        constraints: strategy.constraints || [],
+        parameters: strategy.parameters || {},
+    };
+
+    // Check for org-based constraints
+    const orgConstraint = result.constraints.find(
+        c => c.contextName === 'orgId' || 
+             c.contextName === 'organizationId' ||
+             c.contextName === 'org_id'
+    );
+
+    if (orgConstraint) {
+        result.orgIds = orgConstraint.values || [];
+    }
+
+    if (result.parameters.orgIds) {
+        result.orgIds = result.parameters.orgIds.split(',').map(s => s.trim());
+    }
+
+    return result;
+};
+
+// Format strategy for display
+const formatStrategySimple = (strategies) => {
+    if (!strategies || strategies.length === 0) return 'All';
+    
+    for (const s of strategies) {
+        const parsed = parseStrategy(s);
+        const name = parsed.name?.toLowerCase() || '';
+        
+        if (name === 'perorg' || name.includes('perorg')) {
+            const orgCount = parsed.orgIds?.length || 0;
+            return orgCount > 0 ? `${orgCount} orgs` : 'perOrg';
+        }
+        
+        if (name === 'excludeperorg' || name === 'excludebyorg' || name.includes('exclude')) {
+            const orgCount = parsed.orgIds?.length || 0;
+            return orgCount > 0 ? `excl ${orgCount} orgs` : 'exclude';
+        }
+        
+        if (name === 'flexiblerollout' || name.includes('rollout')) {
+            const rollout = parsed.parameters?.rollout;
+            if (rollout === '100' || rollout === 100) return 'All';
+            if (rollout) return `${rollout}%`;
+            return 'All';
+        }
+        
+        if (name === 'default') return 'All';
+        
+        return `?${parsed.name}`;
+    }
+    
+    return 'All';
+};
+
+// Format user email to username
+const formatUser = (email) => {
+    if (!email) return 'unknown';
+    const match = email.match(/^([^@]+)/);
+    return match ? match[1] : email;
+};
+
+// Unleash status endpoint - check if tokens are configured
+app.get('/api/unleash/status', async (req, res) => {
+    // Also fetch the current list of codebase flags to show in status
+    const codebaseFlags = await fetchFeatureConstants();
+    res.json({
+        configured: !!(UNLEASH_STAGING_TOKEN && UNLEASH_PROD_TOKEN),
+        staging: {
+            configured: !!UNLEASH_STAGING_TOKEN,
+            url: UNLEASH_STAGING_URL
+        },
+        production: {
+            configured: !!UNLEASH_PROD_TOKEN,
+            url: UNLEASH_PROD_URL
+        },
+        project: UNLEASH_PROJECT,
+        featureConstantsUrl: FEATURE_CONSTANTS_URL,
+        codebaseFlagsCount: codebaseFlags.length
+    });
+});
+
+// Get all feature flags comparison between staging and production
+app.get('/api/unleash/flags', async (req, res) => {
+    if (!UNLEASH_STAGING_TOKEN || !UNLEASH_PROD_TOKEN) {
+        return res.status(503).json({ 
+            error: 'Unleash tokens not configured on server',
+            configured: {
+                staging: !!UNLEASH_STAGING_TOKEN,
+                production: !!UNLEASH_PROD_TOKEN
+            }
+        });
+    }
+    
+    const { showAll = 'false' } = req.query;
+    
+    try {
+        console.log('🔄 Fetching feature flags from staging and production...');
+        
+        // Fetch the list of flags used in the OCMUI codebase AND features from both environments
+        const [codebaseFlags, stagingResult, prodResult] = await Promise.all([
+            fetchFeatureConstants(),
+            makeUnleashRequest(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, `/admin/projects/${UNLEASH_PROJECT}/features`),
+            makeUnleashRequest(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, `/admin/projects/${UNLEASH_PROJECT}/features`)
+        ]);
+        
+        if (stagingResult.statusCode !== 200) {
+            return res.status(stagingResult.statusCode).json({ 
+                error: 'Failed to fetch staging features', 
+                details: stagingResult.data 
+            });
+        }
+        
+        if (prodResult.statusCode !== 200) {
+            return res.status(prodResult.statusCode).json({ 
+                error: 'Failed to fetch production features', 
+                details: prodResult.data 
+            });
+        }
+        
+        const stagingFeatures = (stagingResult.data.features || []).filter(f => !f.archived);
+        const prodFeatures = (prodResult.data.features || []).filter(f => !f.archived);
+        
+        // Create maps
+        const stagingMap = new Map(stagingFeatures.map(f => [f.name, f]));
+        const prodMap = new Map(prodFeatures.map(f => [f.name, f]));
+        
+        // Combine all flag names from Unleash
+        const allUnleashNames = new Set([...stagingMap.keys(), ...prodMap.keys()]);
+        
+        // Filter to only flags that are used in the OCMUI codebase (from featureConstants.ts)
+        // Unless showAll=true is passed
+        let filteredNames;
+        if (showAll === 'true' || codebaseFlags.length === 0) {
+            filteredNames = [...allUnleashNames];
+            console.log(`📊 Showing ALL ${filteredNames.length} flags (showAll=true or no codebase filter)`);
+        } else {
+            const codebaseFlagsSet = new Set(codebaseFlags);
+            filteredNames = [...allUnleashNames].filter(name => codebaseFlagsSet.has(name));
+            console.log(`📊 Filtered to ${filteredNames.length} flags used in codebase (from ${codebaseFlags.length} defined in featureConstants.ts)`);
+        }
+        
+        // Build comparison data - fetch full details for each flag
+        const flagsData = [];
+        
+        for (const name of filteredNames) {
+            const stagingFeature = stagingMap.get(name);
+            const prodFeature = prodMap.get(name);
+            
+            // Get full feature details to get environment status and strategies
+            let stagingStatus = null;
+            let prodStatus = null;
+            let prodModifiedInfo = null;
+            
+            if (stagingFeature) {
+                try {
+                    const fullFeature = await makeUnleashRequest(
+                        UNLEASH_STAGING_URL, 
+                        UNLEASH_STAGING_TOKEN, 
+                        `/admin/projects/${UNLEASH_PROJECT}/features/${name}`
+                    );
+                    if (fullFeature.statusCode === 200) {
+                        const env = fullFeature.data.environments?.find(e => e.name === 'default') || fullFeature.data.environments?.[0];
+                        stagingStatus = {
+                            enabled: env?.enabled ?? false,
+                            strategies: env?.strategies || []
+                        };
+                    }
+                } catch (e) {
+                    console.error(`Error fetching staging details for ${name}:`, e.message);
+                }
+            }
+            
+            if (prodFeature) {
+                try {
+                    const fullFeature = await makeUnleashRequest(
+                        UNLEASH_PROD_URL, 
+                        UNLEASH_PROD_TOKEN, 
+                        `/admin/projects/${UNLEASH_PROJECT}/features/${name}`
+                    );
+                    if (fullFeature.statusCode === 200) {
+                        const env = fullFeature.data.environments?.find(e => e.name === 'default') || fullFeature.data.environments?.[0];
+                        prodStatus = {
+                            enabled: env?.enabled ?? false,
+                            strategies: env?.strategies || []
+                        };
+                    }
+                    
+                    // Get events for last modified info
+                    const eventsResult = await makeUnleashRequest(
+                        UNLEASH_PROD_URL,
+                        UNLEASH_PROD_TOKEN,
+                        `/admin/events/${encodeURIComponent(name)}`
+                    );
+                    
+                    if (eventsResult.statusCode === 200 && eventsResult.data.events) {
+                        const events = eventsResult.data.events.filter(e => e.featureName === name);
+                        events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                        
+                        const meaningfulTypes = [
+                            'feature-environment-enabled',
+                            'feature-environment-disabled', 
+                            'feature-strategy-add',
+                            'feature-strategy-update',
+                            'feature-strategy-remove',
+                            'feature-created',
+                        ];
+                        
+                        const lastMeaningful = events.find(e => meaningfulTypes.includes(e.type));
+                        if (lastMeaningful) {
+                            prodModifiedInfo = {
+                                date: lastMeaningful.createdAt,
+                                user: formatUser(lastMeaningful.createdBy),
+                                action: lastMeaningful.type.includes('enabled') ? 'enabled' :
+                                        lastMeaningful.type.includes('disabled') ? 'disabled' :
+                                        lastMeaningful.type === 'feature-created' ? 'created' : 'updated'
+                            };
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Error fetching prod details for ${name}:`, e.message);
+                }
+            } else if (stagingFeature) {
+                // For staging-only flags, get events from staging
+                try {
+                    const eventsResult = await makeUnleashRequest(
+                        UNLEASH_STAGING_URL,
+                        UNLEASH_STAGING_TOKEN,
+                        `/admin/events/${encodeURIComponent(name)}`
+                    );
+                    
+                    if (eventsResult.statusCode === 200 && eventsResult.data.events) {
+                        const events = eventsResult.data.events.filter(e => e.featureName === name);
+                        events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                        
+                        const meaningfulTypes = [
+                            'feature-environment-enabled',
+                            'feature-environment-disabled', 
+                            'feature-strategy-add',
+                            'feature-strategy-update',
+                            'feature-strategy-remove',
+                            'feature-created',
+                        ];
+                        
+                        const lastMeaningful = events.find(e => meaningfulTypes.includes(e.type));
+                        if (lastMeaningful) {
+                            prodModifiedInfo = {
+                                date: lastMeaningful.createdAt,
+                                user: formatUser(lastMeaningful.createdBy),
+                                action: lastMeaningful.type.includes('enabled') ? 'enabled' :
+                                        lastMeaningful.type.includes('disabled') ? 'disabled' :
+                                        lastMeaningful.type === 'feature-created' ? 'created' : 'updated'
+                            };
+                        }
+                    }
+                } catch (e) {
+                    // Ignore event fetch errors
+                }
+            }
+            
+            const staging = stagingStatus ? (stagingStatus.enabled ? 'ON' : 'OFF') : '-';
+            const production = prodStatus ? (prodStatus.enabled ? 'ON' : 'OFF') : '-';
+            const mismatch = staging !== '-' && production !== '-' && staging !== production;
+            
+            const strategy = formatStrategySimple(prodStatus?.strategies || stagingStatus?.strategies);
+            
+            // Check if this flag is defined in the codebase
+            const codebaseFlagsSet = new Set(codebaseFlags);
+            const inCode = codebaseFlagsSet.has(name);
+            
+            flagsData.push({
+                name,
+                inCode,
+                staging,
+                production,
+                mismatch,
+                strategy,
+                stagingOnly: staging !== '-' && production === '-',
+                prodOnly: staging === '-' && production !== '-',
+                modifiedBy: prodModifiedInfo?.user || null,
+                modifiedAt: prodModifiedInfo?.date || null,
+                modifiedAction: prodModifiedInfo?.action || null
+            });
+        }
+        
+        // Sort: mismatches first, then alphabetically
+        flagsData.sort((a, b) => {
+            if (a.mismatch !== b.mismatch) return b.mismatch ? 1 : -1;
+            return a.name.localeCompare(b.name);
+        });
+        
+        // Summary stats
+        const summary = {
+            total: flagsData.length,
+            prodOn: flagsData.filter(f => f.production === 'ON').length,
+            notReleased: flagsData.filter(f => f.mismatch).length,
+            stagingOnly: flagsData.filter(f => f.stagingOnly).length,
+            prodOnly: flagsData.filter(f => f.prodOnly).length,
+            orgRestricted: flagsData.filter(f => f.strategy.includes('org')).length
+        };
+        
+        console.log(`✅ Feature flags comparison complete: ${summary.total} flags, ${summary.notReleased} not released`);
+        
+        res.json({
+            success: true,
+            flags: flagsData,
+            summary,
+            featureConstantsUrl: FEATURE_CONSTANTS_URL,
+            codebaseFlagsCount: codebaseFlags.length
+        });
+        
+    } catch (error) {
+        console.error('Feature flags fetch error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            details: error.message 
+        });
+    }
+});
 
 // Serve React app for all other routes (SPA routing support)
 app.get('*', (req, res) => {

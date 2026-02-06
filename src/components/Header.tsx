@@ -9,7 +9,8 @@ interface HeaderProps {
   tabConfig: Array<{
     id: TabType;
     label: string;
-    icon: string;
+    icon: string | null;
+    emoji?: string;
   }>;
   currentTab: TabType;
   onTabChange: (tab: TabType) => void;

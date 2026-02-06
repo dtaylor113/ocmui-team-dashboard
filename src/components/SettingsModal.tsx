@@ -20,6 +20,7 @@ const SettingsModal: React.FC = () => {
     github: { testing: false, result: null as { success: boolean; message: string } | null },
     jira: { testing: false, result: null as { success: boolean; message: string } | null }
   });
+  const [showSecurityInfo, setShowSecurityInfo] = useState(false);
 
   // Update form data when modal opens with current settings
   useEffect(() => {
@@ -110,9 +111,18 @@ const SettingsModal: React.FC = () => {
       <div className="modal-content">
         <div className="modal-header">
           <h2>⚙️ Settings</h2>
-          <button className="modal-close" onClick={closeSettingsModal}>
-            &times;
-          </button>
+          <div className="modal-header-actions">
+            <button 
+              className="btn btn-security-info"
+              onClick={() => setShowSecurityInfo(true)}
+              title="View application security information"
+            >
+              <span className="info-icon">ⓘ</span> App Security
+            </button>
+            <button className="modal-close" onClick={closeSettingsModal}>
+              &times;
+            </button>
+          </div>
         </div>
         
         <div className="modal-body">
@@ -201,17 +211,6 @@ const SettingsModal: React.FC = () => {
 
         <div className="modal-footer">
           <div className="modal-footer-left">
-            <button 
-              className="btn btn-danger" 
-              onClick={() => {
-                if (window.confirm('This will clear your identity and settings. You will need to set up again. Continue?')) {
-                  resetIdentity();
-                }
-              }}
-              title="Clear all settings and restart the 'Who are you?' setup"
-            >
-              🚪 Log Out
-            </button>
             <a 
               className="btn btn-feedback" 
               href="https://redhat-internal.slack.com/app_redirect?channel=UA0LKKEMU" 
@@ -222,6 +221,17 @@ const SettingsModal: React.FC = () => {
               <img src={slackIcon} alt="Slack" className="btn-icon" />
               Feedback
             </a>
+            <button 
+              className="btn btn-danger btn-feedback" 
+              onClick={() => {
+                if (window.confirm('This will clear your identity and settings. You will need to set up again. Continue?')) {
+                  resetIdentity();
+                }
+              }}
+              title="Clear all settings and restart the 'Who are you?' setup"
+            >
+              🚪 Log Out
+            </button>
           </div>
           <div className="modal-footer-right">
             <button className="btn btn-secondary" onClick={closeSettingsModal}>
@@ -232,6 +242,87 @@ const SettingsModal: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Security Info Modal */}
+        {showSecurityInfo && (
+          <div className="security-info-overlay" onClick={() => setShowSecurityInfo(false)}>
+            <div className="security-info-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="security-info-header">
+                <h3>🔒 Application Security</h3>
+                <button className="security-info-close" onClick={() => setShowSecurityInfo(false)}>×</button>
+              </div>
+              <div className="security-info-content">
+                <section>
+                  <h4>🔐 API Token Management</h4>
+                  <p>
+                    GitHub and JIRA service account tokens are securely stored as <strong>Kubernetes Secrets</strong> in 
+                    the OpenShift cluster. These tokens are never exposed to the browser or stored in client-side code.
+                  </p>
+                </section>
+
+                <section>
+                  <h4>🖥️ Server-Side API Proxy</h4>
+                  <p>
+                    All GitHub and JIRA API requests are proxied through the backend server. Your browser never 
+                    directly contacts these APIs, ensuring tokens remain protected and API usage is controlled.
+                  </p>
+                </section>
+
+                <section>
+                  <h4>👤 User Identity</h4>
+                  <p>
+                    Your identity (name, GitHub username, JIRA email) is stored locally in your browser's 
+                    <code>localStorage</code>. This data is used only to filter which PRs and tickets to display—it 
+                    is never transmitted to external services.
+                  </p>
+                </section>
+
+                <section>
+                  <h4>📊 Data Access</h4>
+                  <p>
+                    This dashboard has <strong>read-only access</strong> to GitHub and JIRA. It cannot modify 
+                    repositories, PRs, tickets, or any other resources. The service account tokens are scoped 
+                    with minimal permissions.
+                  </p>
+                </section>
+
+                <section>
+                  <h4>🌐 Network Security</h4>
+                  <p>
+                    The application is served over HTTPS with TLS encryption. The OpenShift cluster provides 
+                    additional network isolation and security controls.
+                  </p>
+                </section>
+
+                <section>
+                  <h4>🔑 Access Control</h4>
+                  <p>
+                    The dashboard is protected with <strong>HTTP Basic Authentication</strong>. A shared team 
+                    username and password are required to access the application. These credentials are stored 
+                    securely in Kubernetes Secrets—not in the codebase.
+                  </p>
+                </section>
+
+                <section>
+                  <h4>🚀 Future: Red Hat SSO</h4>
+                  <p>
+                    We plan to integrate <strong>Red Hat SSO</strong> (Single Sign-On) for authentication. This 
+                    will allow team members to log in with their Red Hat credentials, eliminating the need for 
+                    a shared password and providing individual user identification.
+                  </p>
+                </section>
+
+                <section>
+                  <h4>📁 Team Roster</h4>
+                  <p>
+                    The team member list is stored on the server's persistent storage. Only team member names, 
+                    roles, timezones, and usernames are stored—no sensitive credentials.
+                  </p>
+                </section>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>,
     document.body

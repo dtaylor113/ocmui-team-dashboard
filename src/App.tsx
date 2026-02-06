@@ -7,10 +7,11 @@ import SettingsModal from './components/SettingsModal';
 import FirstRunIdentityModal from './components/FirstRunIdentityModal';
 import jiraLogo from './assets/jiraLogo.png';
 import githubIcon from './assets/githubIcon.png';
+import unleashIcon from './assets/unleash.png';
 import './styles/App.css';
 
 // Define our simplified single-row navigation structure
-export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'jira-lookup';
+export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'jira-lookup' | 'feature-flags';
 
 interface AppState {
   currentTab: TabType;
@@ -42,6 +43,11 @@ const tabConfig = [
     id: 'jira-lookup' as TabType, 
     label: 'JIRA Lookup', 
     icon: jiraLogo 
+  },
+  { 
+    id: 'feature-flags' as TabType, 
+    label: 'Feature Flags', 
+    icon: unleashIcon
   }
 ];
 
