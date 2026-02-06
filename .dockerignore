@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+
+# Build output (we rebuild in Docker)
+dist
+
+# Development files
+.git
+.gitignore
+.env
+.env.*
+*.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation (not needed in image)
+*.md
+!README.md
+
+# OpenShift manifests (not needed in image)
+openshift/
+
+# macOS
+.DS_Store
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+coverage

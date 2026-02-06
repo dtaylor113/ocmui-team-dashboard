@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QueryProvider } from './contexts/QueryProvider';
 import { SettingsProvider } from './contexts/SettingsContext';
 import Header from './components/Header';
 import SplitPanel from './components/SplitPanel';
 import SettingsModal from './components/SettingsModal';
+import FirstRunIdentityModal from './components/FirstRunIdentityModal';
 import jiraLogo from './assets/jiraLogo.png';
 import githubIcon from './assets/githubIcon.png';
 import './styles/App.css';
@@ -57,6 +58,23 @@ export default function App() {
     return { currentTab: 'my-sprint-jiras' };
   });
 
+  // First-run identity check
+  const [showFirstRun, setShowFirstRun] = useState(false);
+  const [identityChecked, setIdentityChecked] = useState(false);
+
+  useEffect(() => {
+    // Check if user has selected their identity
+    const storedIdentity = localStorage.getItem('ocmui_selected_team_member');
+    if (!storedIdentity) {
+      setShowFirstRun(true);
+    }
+    setIdentityChecked(true);
+  }, []);
+
+  const handleFirstRunComplete = () => {
+    setShowFirstRun(false);
+  };
+
   const handleTabChange = (tab: TabType) => {
     setAppState({
       currentTab: tab
@@ -67,6 +85,11 @@ export default function App() {
       // ignore storage errors
     }
   };
+
+  // Don't render app until we've checked identity status
+  if (!identityChecked) {
+    return null;
+  }
 
   return (
     <QueryProvider>
@@ -83,6 +106,11 @@ export default function App() {
           />
           
           <SettingsModal />
+          
+          <FirstRunIdentityModal 
+            isOpen={showFirstRun} 
+            onComplete={handleFirstRunComplete} 
+          />
         </div>
       </SettingsProvider>
     </QueryProvider>

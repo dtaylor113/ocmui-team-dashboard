@@ -48,6 +48,11 @@ const SettingsModal: React.FC = () => {
 
     const result = await testGithubToken(formData.github);
     
+    // Auto-fill GitHub username if test succeeded and we got a username
+    if (result.success && result.username) {
+      setFormData(prev => ({ ...prev, githubUsername: result.username! }));
+    }
+    
     setTestStates(prev => ({ 
       ...prev, 
       github: { testing: false, result } 
@@ -69,6 +74,11 @@ const SettingsModal: React.FC = () => {
     }));
 
     const result = await testJiraToken(formData.jira);
+    
+    // Auto-fill JIRA username (email) if test succeeded and we got an email
+    if (result.success && result.userEmail) {
+      setFormData(prev => ({ ...prev, jiraUsername: result.userEmail! }));
+    }
     
     setTestStates(prev => ({ 
       ...prev, 

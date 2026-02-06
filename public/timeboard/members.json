@@ -2,17 +2,23 @@
   {
     "name": "Dylan Cooper",
     "role": "dev",
-    "tz": "America/Denver"
+    "tz": "America/Denver",
+    "github": "dylanlott",
+    "jira": "dcooper@redhat.com"
   },
   {
     "name": "Zac Herman",
     "role": "dev",
-    "tz": "America/Denver"
+    "tz": "America/Denver",
+    "github": "zherman0",
+    "jira": "zherman@redhat.com"
   },
   {
     "name": "Dave Taylor",
     "role": "team lead",
-    "tz": "America/New_York"
+    "tz": "America/New_York",
+    "github": "dtaylor113",
+    "jira": "dtaylor@redhat.com"
   },
   {
     "name": "Trevor Hendricks",

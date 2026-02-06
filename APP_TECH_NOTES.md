@@ -284,3 +284,146 @@ The `setup.sh` script prepares your environment for running the dashboard.
     lsof -ti:3017 | xargs kill -9
     ```
   - Re-run `./setup.sh` safely any time; it is idempotent.
+
+---
+
+## ☁️ OpenShift Deployment (ROSA HCP)
+
+The dashboard is deployed to a ROSA HCP (Hosted Control Plane) cluster on AWS.
+
+### Live URL
+```
+https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com
+```
+
+### Cluster Details
+| Property | Value |
+|----------|-------|
+| Cluster Name | `ocmui-team-dashboard` |
+| Type | ROSA HCP (Hosted Control Plane) |
+| Region | us-east-1 |
+| Namespace | `ocmui-dashboard` |
+| Image Registry | OpenShift Internal Registry |
+
+### Prerequisites
+
+```bash
+# Install OpenShift CLI
+brew install openshift-cli
+
+# Install Podman (container engine)
+brew install podman
+
+# Start Podman machine (if not running)
+podman machine start
+```
+
+### Why Podman?
+
+Podman is a daemonless container engine (alternative to Docker):
+- **No daemon**: Doesn't require a background service
+- **Rootless**: Runs without root privileges by default
+- **Docker-compatible**: Same commands (`podman build`, `podman push`)
+- **Lighter**: No Docker Desktop required on macOS
+
+### Logging into the Cluster
+
+1. Go to [OCM Console](https://console.redhat.com/openshift)
+2. Select `ocmui-team-dashboard` cluster
+3. Click **"Open console"** to access the OCP web console
+4. Click your username → **"Copy login command"** → **"Display Token"**
+5. Run the `oc login` command in terminal:
+
+```bash
+oc login --token=sha256~YOUR_TOKEN --server=https://api.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com:443
+```
+
+### Making Code Changes and Deploying
+
+#### Quick Deploy (after code changes)
+
+```bash
+# 1. Make sure you're in the project directory
+cd /path/to/ocmui-team-dashboard
+
+# 2. Build for linux/amd64 (required for AWS/OpenShift)
+#    IMPORTANT: Mac M1/M2 builds ARM images by default - must specify platform!
+podman build --platform linux/amd64 -t ocmui-team-dashboard:latest .
+
+# 3. Login to OpenShift (if not already)
+oc login --token=YOUR_TOKEN --server=https://api.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com:443
+
+# 4. Switch to the dashboard namespace
+oc project ocmui-dashboard
+
+# 5. Login to the internal registry
+REGISTRY="default-route-openshift-image-registry.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com"
+podman login -u $(oc whoami) -p $(oc whoami -t) $REGISTRY --tls-verify=false
+
+# 6. Tag and push the image
+podman tag localhost/ocmui-team-dashboard:latest $REGISTRY/ocmui-dashboard/ocmui-team-dashboard:latest
+podman push $REGISTRY/ocmui-dashboard/ocmui-team-dashboard:latest --tls-verify=false
+
+# 7. Restart the deployment to pick up the new image
+oc rollout restart deployment/ocmui-team-dashboard
+
+# 8. Watch the rollout
+oc rollout status deployment/ocmui-team-dashboard
+```
+
+#### One-liner Deploy Script
+
+```bash
+# From the project root, after making changes:
+podman build --platform linux/amd64 -t ocmui-team-dashboard:latest . && \
+REGISTRY="default-route-openshift-image-registry.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com" && \
+podman tag localhost/ocmui-team-dashboard:latest $REGISTRY/ocmui-dashboard/ocmui-team-dashboard:latest && \
+podman push $REGISTRY/ocmui-dashboard/ocmui-team-dashboard:latest --tls-verify=false && \
+oc rollout restart deployment/ocmui-team-dashboard
+```
+
+### Monitoring & Troubleshooting
+
+```bash
+# Check pod status
+oc get pods
+
+# View logs (live)
+oc logs deployment/ocmui-team-dashboard -f
+
+# View recent logs
+oc logs deployment/ocmui-team-dashboard --tail=50
+
+# Describe pod for events/errors
+oc describe pod -l app=ocmui-team-dashboard
+
+# Get the public URL
+oc get route ocmui-team-dashboard -o jsonpath='https://{.spec.host}'
+
+# Restart if something goes wrong
+oc rollout restart deployment/ocmui-team-dashboard
+
+# Check resource usage
+oc adm top pods
+```
+
+### Architecture Notes
+
+- **Platform**: Image must be built for `linux/amd64` (x86_64)
+  - Apple Silicon Macs build ARM images by default
+  - Use `--platform linux/amd64` flag with podman/docker
+- **Port**: Server runs on port 8080 inside the container (OpenShift standard)
+- **TLS**: Handled by OpenShift Route (edge termination)
+- **Health checks**: Configured in deployment.yaml (liveness/readiness probes)
+
+### File Reference
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Multi-stage build (builder → production) |
+| `openshift/deployment.yaml` | Pod spec, env vars, probes, resources |
+| `openshift/service.yaml` | ClusterIP service on port 8080 |
+| `openshift/route.yaml` | HTTPS route with TLS |
+| `openshift/kustomization.yaml` | Kustomize config, image reference |
+| `openshift/secrets.example.yaml` | Template for Phase 3 tokens |
+| `README-openshift.md` | Detailed deployment guide |

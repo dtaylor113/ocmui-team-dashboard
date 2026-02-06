@@ -1,0 +1,20 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ocmui-team-dashboard
+  labels:
+    app: ocmui-team-dashboard
+spec:
+  # The hostname will be auto-generated if not specified
+  # Uncomment and customize if you want a specific hostname:
+  # host: ocmui-dashboard.apps.your-cluster.example.com
+  to:
+    kind: Service
+    name: ocmui-team-dashboard
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

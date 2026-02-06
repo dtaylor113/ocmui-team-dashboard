@@ -6,6 +6,8 @@ interface TeamMember {
   name: string;
   role: string;
   tz: string;
+  github?: string;  // GitHub username
+  jira?: string;    // JIRA email or username
 }
 
 interface TimeDisplayMember extends TeamMember {
@@ -21,7 +23,7 @@ interface TimeboardModalProps {
 }
 
 const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
-  const { updateUserPreferences } = useSettings();
+  const { updateUserPreferences, apiTokens, saveSettings } = useSettings();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [searchFilter, setSearchFilter] = useState('');
   const [referenceMode, setReferenceMode] = useState<'now' | 'ref'>('now');
@@ -29,7 +31,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   const [refTz, setRefTz] = useState('America/New_York');
   // Inline editing state
   const [editingIndex, setEditingIndex] = useState<number | null>(null); // -1 for new, otherwise index
-  const [draftMember, setDraftMember] = useState<TeamMember>({ name: '', role: '', tz: '' });
+  const [draftMember, setDraftMember] = useState<TeamMember>({ name: '', role: '', tz: '', github: '', jira: '' });
   
   // "I am..." functionality
   const [showIdentitySelection, setShowIdentitySelection] = useState(false);
@@ -91,9 +93,15 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       if (stored) {
         const customMembers = JSON.parse(stored);
         if (customMembers && customMembers.length > 0) {
-          // Backward compatibility: drop unknown fields like location
+          // Preserve github/jira identity fields along with core fields
           const cleaned = customMembers
-            .map((m: any) => ({ name: m.name, role: m.role, tz: m.tz }))
+            .map((m: any) => ({ 
+              name: m.name, 
+              role: m.role, 
+              tz: m.tz,
+              github: m.github || undefined,
+              jira: m.jira || undefined
+            }))
             .filter((m: any) => isValidTimezone(m.tz)); // guard invalid tz from previous saves
           setMembers(cleaned);
           console.log(`🕐 Loaded ${customMembers.length} team members from localStorage`);
@@ -106,7 +114,13 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const membersData = await response.json();
       const cleaned = (Array.isArray(membersData) ? membersData : [])
-        .map((m: any) => ({ name: m.name, role: m.role, tz: m.tz }))
+        .map((m: any) => ({ 
+          name: m.name, 
+          role: m.role, 
+          tz: m.tz,
+          github: m.github || undefined,
+          jira: m.jira || undefined
+        }))
         .filter((m: any) => isValidTimezone(m.tz));
       setMembers(cleaned);
       console.log(`🕐 Loaded ${membersData.length} team members from JSON`);
@@ -327,13 +341,18 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     const idx = members.findIndex(m => m.name === memberKey.name && m.tz === memberKey.tz);
     if (idx >= 0) {
       setEditingIndex(idx);
-      setDraftMember({ ...members[idx] });
+      // Ensure github/jira are initialized for editing
+      setDraftMember({ 
+        ...members[idx],
+        github: members[idx].github || '',
+        jira: members[idx].jira || ''
+      });
     }
   };
 
   const startAdd = () => {
     setEditingIndex(-1);
-    setDraftMember({ name: '', role: '', tz: refTz || 'America/New_York' });
+    setDraftMember({ name: '', role: '', tz: refTz || 'America/New_York', github: '', jira: '' });
   };
 
   // Identity selection functions
@@ -348,13 +367,29 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     // Set user's timezone to selected member's timezone
     updateUserPreferences({ timezone: member.tz });
     
-    // Store selection for persistence
+    // Store selection for persistence (include github/jira for identity)
     localStorage.setItem('ocmui_selected_team_member', JSON.stringify({
       name: member.name,
-      timezone: member.tz
+      timezone: member.tz,
+      github: member.github,
+      jira: member.jira
     }));
     
-    console.log(`✅ Set identity as ${member.name} with timezone ${member.tz}`);
+    // Propagate github/jira usernames to Settings context if available
+    // This ensures API queries use the correct identity
+    if (member.github || member.jira) {
+      const updatedTokens = { ...apiTokens };
+      if (member.github) {
+        updatedTokens.githubUsername = member.github;
+      }
+      if (member.jira) {
+        updatedTokens.jiraUsername = member.jira;
+      }
+      saveSettings(updatedTokens);
+      console.log(`✅ Set identity as ${member.name} with GitHub: ${member.github}, JIRA: ${member.jira}`);
+    } else {
+      console.log(`✅ Set identity as ${member.name} with timezone ${member.tz} (no github/jira configured)`);
+    }
   };
 
   const getIdentityButtonText = (): string => {
@@ -384,20 +419,26 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
 
   const cancelEdit = () => {
     setEditingIndex(null);
-    setDraftMember({ name: '', role: '', tz: '' });
+    setDraftMember({ name: '', role: '', tz: '', github: '', jira: '' });
   };
 
   const saveDraft = async () => {
-    const { name, role, tz } = draftMember;
+    const { name, role, tz, github, jira } = draftMember;
     if (!name.trim() || !role.trim() || !tz) {
-      alert('Please fill in all fields');
+      alert('Please fill in Name, Role, and Timezone');
       return;
     }
     if (!isValidTimezone(tz)) {
       alert('Please choose a valid timezone from the list. You can search by city name like Bangalore.');
       return;
     }
-    const trimmed: TeamMember = { name: name.trim(), role: role.trim(), tz };
+    const trimmed: TeamMember = { 
+      name: name.trim(), 
+      role: role.trim(), 
+      tz,
+      github: github?.trim() || undefined,
+      jira: jira?.trim() || undefined
+    };
     let newMembers = [...members];
     if (editingIndex === -1) {
       newMembers.unshift(trimmed);
@@ -425,7 +466,13 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       const response = await fetch('/timeboard/members.json');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      const cleaned = (Array.isArray(data) ? data : []).map((m: any) => ({ name: m.name, role: m.role, tz: m.tz }));
+      const cleaned = (Array.isArray(data) ? data : []).map((m: any) => ({ 
+        name: m.name, 
+        role: m.role, 
+        tz: m.tz,
+        github: m.github || undefined,
+        jira: m.jira || undefined
+      }));
       await saveMembers(cleaned);
       console.log('Reloaded /timeboard/members.json into localStorage');
     } catch (e) {
@@ -580,47 +627,75 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
             <tbody>
               {/* New member inline row */}
               {editingIndex === -1 && (
-                <tr key="new-member-row">
-                  {showIdentitySelection && <td></td>}
-                  <td style={{ width: '20%' }}>
-                    <input
-                      type="text"
-                      placeholder="Name"
-                      value={draftMember.name}
-                      onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
-                      style={{ padding: '4px 6px', width: '120px', minWidth: '120px', maxWidth: '120px', display: 'inline-block' }}
-                      maxLength={25}
-                    />
-                  </td>
-                  <td style={{ width: '10%' }}>
-                    <input
-                      type="text"
-                      placeholder="Role"
-                      value={draftMember.role}
-                      onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
-                      style={{ padding: '4px 6px', width: '80px', minWidth: '80px', maxWidth: '80px', display: 'inline-block' }}
-                      maxLength={25}
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={draftMember.tz}
-                      onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
-                    >
-                      <option value="">Select timezone…</option>
-                      {tzWithSort.map(tz => (
-                        <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="mono" colSpan={2}>—</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="timeboard-btn timeboard-btn-primary timeboard-btn-small" onClick={saveDraft}>Save</button>
-                      <button className="timeboard-btn timeboard-btn-secondary timeboard-btn-small" onClick={cancelEdit}>Cancel</button>
-                    </div>
-                  </td>
-                </tr>
+                <>
+                  <tr key="new-member-row">
+                    {showIdentitySelection && <td></td>}
+                    <td style={{ width: '20%' }}>
+                      <input
+                        type="text"
+                        placeholder="Name"
+                        value={draftMember.name}
+                        onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
+                        style={{ padding: '4px 6px', width: '120px', minWidth: '120px', maxWidth: '120px', display: 'inline-block' }}
+                        maxLength={25}
+                      />
+                    </td>
+                    <td style={{ width: '10%' }}>
+                      <input
+                        type="text"
+                        placeholder="Role"
+                        value={draftMember.role}
+                        onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
+                        style={{ padding: '4px 6px', width: '80px', minWidth: '80px', maxWidth: '80px', display: 'inline-block' }}
+                        maxLength={25}
+                      />
+                    </td>
+                    <td>
+                      <select
+                        value={draftMember.tz}
+                        onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
+                      >
+                        <option value="">Select timezone…</option>
+                        {tzWithSort.map(tz => (
+                          <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="mono" colSpan={2}>—</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="timeboard-btn timeboard-btn-primary timeboard-btn-small" onClick={saveDraft}>Save</button>
+                        <button className="timeboard-btn timeboard-btn-secondary timeboard-btn-small" onClick={cancelEdit}>Cancel</button>
+                      </div>
+                    </td>
+                  </tr>
+                  {/* Identity fields row */}
+                  <tr key="new-member-identity-row" className="identity-fields-row">
+                    {showIdentitySelection && <td></td>}
+                    <td colSpan={5} style={{ paddingTop: 0, paddingBottom: 8 }}>
+                      <div style={{ display: 'flex', gap: 16, alignItems: 'center', fontSize: 12, color: '#9ca3af' }}>
+                        <span>Identity (optional):</span>
+                        <input
+                          type="text"
+                          placeholder="GitHub username"
+                          value={draftMember.github || ''}
+                          onChange={(e) => setDraftMember(prev => ({ ...prev, github: e.target.value }))}
+                          style={{ padding: '3px 6px', width: '120px', fontSize: 12 }}
+                          maxLength={40}
+                        />
+                        <input
+                          type="text"
+                          placeholder="JIRA email"
+                          value={draftMember.jira || ''}
+                          onChange={(e) => setDraftMember(prev => ({ ...prev, jira: e.target.value }))}
+                          style={{ padding: '3px 6px', width: '180px', fontSize: 12 }}
+                          maxLength={60}
+                        />
+                      </div>
+                    </td>
+                    <td></td>
+                  </tr>
+                </>
               )}
 
               {displayMembers.map((member) => (
@@ -654,6 +729,17 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                               style={{ padding: '4px 6px', width: '120px', minWidth: '120px', maxWidth: '120px', display: 'inline-block' }}
                               maxLength={25}
                             />
+                            <div style={{ marginTop: 4 }}>
+                              <input
+                                type="text"
+                                placeholder="GitHub"
+                                value={draftMember.github || ''}
+                                onChange={(e) => setDraftMember(prev => ({ ...prev, github: e.target.value }))}
+                                style={{ padding: '2px 4px', width: '100px', fontSize: 11, color: '#9ca3af' }}
+                                maxLength={40}
+                                title="GitHub username for identity"
+                              />
+                            </div>
                           </td>
                           <td style={{ width: '10%' }}>
                             <input
@@ -663,6 +749,17 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                               style={{ padding: '4px 6px', width: '80px', minWidth: '80px', maxWidth: '80px', display: 'inline-block' }}
                               maxLength={25}
                             />
+                            <div style={{ marginTop: 4 }}>
+                              <input
+                                type="text"
+                                placeholder="JIRA email"
+                                value={draftMember.jira || ''}
+                                onChange={(e) => setDraftMember(prev => ({ ...prev, jira: e.target.value }))}
+                                style={{ padding: '2px 4px', width: '140px', fontSize: 11, color: '#9ca3af' }}
+                                maxLength={60}
+                                title="JIRA email for identity"
+                              />
+                            </div>
                           </td>
                           <td>
                             <select

@@ -11,8 +11,8 @@ interface SettingsContextType {
   closeSettingsModal: () => void;
   saveSettings: (tokens: ApiTokens) => void;
   updateUserPreferences: (preferences: Partial<UserPreferences>) => void;
-  testGithubToken: (token: string) => Promise<{ success: boolean; message: string }>;
-  testJiraToken: (token: string) => Promise<{ success: boolean; message: string }>;
+  testGithubToken: (token: string) => Promise<{ success: boolean; message: string; username?: string }>;
+  testJiraToken: (token: string) => Promise<{ success: boolean; message: string; userEmail?: string }>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -121,7 +121,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     console.log('✅ User preferences updated successfully');
   };
 
-  const testGithubToken = async (token: string): Promise<{ success: boolean; message: string }> => {
+  const testGithubToken = async (token: string): Promise<{ success: boolean; message: string; username?: string }> => {
     if (!token) {
       return { success: false, message: 'Token is required' };
     }
@@ -136,7 +136,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
       if (response.ok) {
         const userData = await response.json();
-        return { success: true, message: `Connected as ${userData.login}` };
+        // Return the username so it can be auto-filled
+        return { success: true, message: `Connected as ${userData.login}`, username: userData.login };
       } else {
         const errorData = await response.json();
         return { success: false, message: errorData.message || 'Invalid token' };
@@ -147,7 +148,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     }
   };
 
-  const testJiraToken = async (token: string): Promise<{ success: boolean; message: string }> => {
+  const testJiraToken = async (token: string): Promise<{ success: boolean; message: string; userEmail?: string }> => {
     if (!token) {
       return { success: false, message: 'Token is required' };
     }
@@ -165,7 +166,14 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          return { success: true, message: 'JIRA connection successful' };
+          // Return the user's email so it can be auto-filled
+          const userEmail = result.user?.emailAddress;
+          const displayName = result.user?.displayName || 'Unknown';
+          return { 
+            success: true, 
+            message: `Connected as ${displayName}`,
+            userEmail 
+          };
         } else {
           return { success: false, message: result.error || 'Authentication failed' };
         }

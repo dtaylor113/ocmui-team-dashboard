@@ -45,10 +45,48 @@ Acceptance
 - Local development (`yarn start`, `yarn start:dev`) remains unchanged.
 - Repository contains everything needed to deploy the current app image to OpenShift.
 
-Branching/Structure
-- To avoid disruption, create a separate hosted variant in a new repository (recommended): `ocmui-team-dashboard-hosted`.
-  - Copy the app at the end of Phase 1, then apply Phases 2–3 there.
-  - Keep this repository as the stable standalone version.
+---
+
+## Phase 2.5 – Initial ROSA Deployment ✅ COMPLETE
+
+Goal: Deploy the app to a ROSA HCP cluster with user-provided tokens.
+
+**Completed: February 6, 2026**
+
+Deployment Details
+- **Cluster**: ROSA HCP on AWS (`ocmui-team-dashboard`)
+- **Namespace**: `ocmui-dashboard`
+- **URL**: `https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com`
+- **Image Registry**: OpenShift internal registry
+- **Architecture**: linux/amd64 (cross-compiled from Apple Silicon)
+
+What Works
+- ✅ First-run "Who are you?" identity modal
+- ✅ Identity selection auto-fills GitHub/JIRA usernames
+- ✅ Token validation with auto-detection of user identity
+- ✅ Full dashboard functionality (My Sprint JIRAs, My PRs, My Code Reviews, JIRA Lookup)
+- ✅ HTTPS via OpenShift Route with edge TLS termination
+
+Current Behavior
+- Users still provide their own GitHub and JIRA tokens
+- Tokens stored in browser localStorage
+- Identity (username) derived from roster selection
+
+Deployment Commands (for reference)
+```bash
+# Build for correct architecture
+podman build --platform linux/amd64 -t ocmui-team-dashboard:latest .
+
+# Push to OpenShift internal registry
+REGISTRY=$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')
+podman push $REGISTRY/ocmui-dashboard/ocmui-team-dashboard:latest --tls-verify=false
+
+# Deploy
+oc apply -k openshift/
+
+# Restart after image update
+oc rollout restart deployment/ocmui-team-dashboard
+```
 
 ---
 
@@ -74,7 +112,28 @@ Acceptance
 - Data visibility matches the service account’s access.
 
 Rollout
-- Implement Phase 3 in the hosted variant repository to keep this repo stable.
+- Can be implemented in this repo now that Phase 2.5 deployment is proven.
+
+---
+
+## Phase 3.5 – Red Hat SSO Integration (Optional Enhancement)
+
+Goal: Replace manual identity selection with SSO-based authentication.
+
+Scope
+- Add OAuth proxy sidecar to deployment
+- Configure Red Hat SSO (Keycloak) as identity provider
+- Map SSO user identity to roster members (by email)
+- Remove "Who are you?" modal; identity comes from SSO headers
+
+Benefits
+- No manual identity selection needed
+- Proper authentication (restrict access to team members)
+- Audit trail of who accessed the dashboard
+
+Prerequisites
+- Red Hat SSO instance or cluster OAuth configuration
+- Service account for OAuth proxy
 
 ---
 
@@ -95,9 +154,14 @@ Acceptance
 
 ## Branching and Repos
 
-- Main repository (this one) remains the standalone app, feature-complete after Phase 1.
-- Hosted variant repository (`ocmui-team-dashboard-hosted`) is created from the Phase 1 tag and receives Phases 2–3 (+ later Phase 4 changes as needed).
-- Use tags to mark phase completions in both repos.
+**Current approach** (simplified):
+- This repository serves both standalone and hosted versions
+- Deployed directly to ROSA HCP cluster (`ocmui-team-dashboard`)
+- No separate hosted variant repository needed
+
+**Deployment model**:
+- Local development: `yarn start` or `yarn start:dev`
+- Hosted: Build with Podman, push to OpenShift internal registry, deploy via `oc apply -k openshift/`
 
 ---
 
@@ -122,11 +186,12 @@ Notes
 
 ## Checklist
 
-- [ ] Phase 1 complete and tagged
-- [ ] Hosted variant repository created from Phase 1 tag
-- [ ] Phase 2 manifests and Dockerfile ready
-- [ ] Phase 3 server proxies and OpenShift deploy
-- [ ] Phase 4 persistence design implemented
+- [x] Phase 1 complete and tagged
+- [x] Phase 2 manifests and Dockerfile ready
+- [x] Phase 2.5 Initial ROSA deployment live! 🎉
+- [ ] Phase 3 server-side tokens (no user tokens needed)
+- [ ] Phase 3.5 Red Hat SSO integration (optional)
+- [ ] Phase 4 shared roster persistence
 
 
 ---

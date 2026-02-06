@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocmui-team-dashboard
+  labels:
+    app: ocmui-team-dashboard
+    app.kubernetes.io/name: ocmui-team-dashboard
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocmui-team-dashboard
+  template:
+    metadata:
+      labels:
+        app: ocmui-team-dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: ocmui-team-dashboard:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+            # Phase 3: Uncomment these when moving tokens to server-side
+            # - name: GITHUB_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: ocmui-dashboard-tokens
+            #       key: github-token
+            # - name: JIRA_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: ocmui-dashboard-tokens
+            #       key: jira-token
+            # - name: JIRA_BASE_URL
+            #   value: "https://issues.redhat.com"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
