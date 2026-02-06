@@ -263,8 +263,8 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
       {/* Reviewers section */}
       <div className="pr-card-reviewers">
         <span className="pr-reviewers-label">Reviewers:</span>
-        {pr.reviewers && pr.reviewers.length > 0 ? (
-          pr.reviewers.map((reviewer) => {
+        {pr.reviewers && pr.reviewers.filter(r => !r.username.endsWith('[bot]')).length > 0 ? (
+          pr.reviewers.filter(r => !r.username.endsWith('[bot]')).map((reviewer) => {
             // Compute notification info based on live conversation data without gating on hasComments
             const notificationInfo = conversationData?.comments ?
               getNotificationInfo(getRepoName(pr), pr.number, reviewer.username, conversationData.comments) :
