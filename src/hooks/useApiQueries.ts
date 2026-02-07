@@ -10,6 +10,7 @@ export const queryKeys = {
   epics: (filter: 'in-progress' | 'planning' | 'all' | 'blocked') => ['jira', 'epics', filter] as const,
   myCodeReviews: ['github', 'code-reviews'] as const,
   myPRs: (status: 'open' | 'closed') => ['github', 'my-prs', status] as const,
+  prByNumber: (repoName: string, prNumber: number) => ['github', 'pr', repoName, prNumber] as const,
   prConversation: (repoName: string, prNumber: number) => ['github', 'pr-conversation', repoName, prNumber] as const,
   reviewerWorkload: ['github', 'reviewer-workload'] as const,
 };
@@ -1088,5 +1089,45 @@ export const useReviewerWorkload = () => {
     refetchIntervalInBackground: false, // Don't refresh in background due to API cost
     staleTime: 3 * 60 * 1000, // Consider data stale after 3 minutes
     retry: 2,
+  });
+};
+
+// ============================================================================
+// PR BY NUMBER (for Quick Find feature)
+// ============================================================================
+
+// Fetch a specific PR by number from uhc-portal repo
+const fetchPRByNumber = async (prNumber: number, currentUser: string): Promise<any> => {
+  const owner = 'RedHatInsights';
+  const repo = 'uhc-portal';
+  
+  // Fetch the PR details
+  const prResponse = await fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}`);
+  
+  if (!prResponse.ok) {
+    if (prResponse.status === 404) {
+      throw new Error(`PR #${prNumber} not found in ${owner}/${repo}`);
+    }
+    throw new Error(`Failed to fetch PR #${prNumber}: ${prResponse.status}`);
+  }
+  
+  const prData = await prResponse.json();
+  
+  // Enhance with reviewer data using the existing helper
+  const enhanced = await enhancePRsWithReviewers([prData], currentUser);
+  
+  return enhanced[0];
+};
+
+// Hook to fetch a specific PR by number
+export const usePRByNumber = (prNumber: number | null) => {
+  const { apiTokens } = useSettings();
+  
+  return useQuery({
+    queryKey: queryKeys.prByNumber('RedHatInsights/uhc-portal', prNumber || 0),
+    queryFn: () => fetchPRByNumber(prNumber!, apiTokens.githubUsername),
+    enabled: !!prNumber && prNumber > 0,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    retry: false, // Don't retry on 404
   });
 };

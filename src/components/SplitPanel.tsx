@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import type { TabType } from '../App';
+import type { TabType, QuickFindType } from '../App';
 import JiraPanel from './JiraPanel';
 import PRPanel from './PRPanel';
 import AssociatedPRsPanel from './AssociatedPRsPanel';
@@ -9,18 +9,31 @@ import FeatureFlagsPanel from './FeatureFlagsPanel';
 import DocLinksPanel from './DocLinksPanel';
 import EpicsPanel from './EpicsPanel';
 import ReviewerWorkloadPanel from './ReviewerWorkloadPanel';
+import QuickFindJiraPanel from './QuickFindJiraPanel';
+import QuickFindPRPanel from './QuickFindPRPanel';
+
+interface QuickFindMode {
+  type: QuickFindType;
+  value: string;
+}
 
 interface SplitPanelProps {
   currentTab: TabType;
+  quickFindMode?: QuickFindMode | null;
 }
 
-const SplitPanel: React.FC<SplitPanelProps> = ({ currentTab }) => {
+const SplitPanel: React.FC<SplitPanelProps> = ({ currentTab, quickFindMode }) => {
   const [leftWidth, setLeftWidth] = useState(50); // Percentage
   const [isDragging, setIsDragging] = useState(false);
   const [prStatus, setPrStatus] = useState<'open' | 'closed'>('open');
   const [selectedTicket, setSelectedTicket] = useState<string | undefined>();
   const [selectedPR, setSelectedPR] = useState<any | undefined>();
   const [invalidJiraIds, setInvalidJiraIds] = useState<string[]>([]);
+  
+  // Track quick find selections separately
+  const [quickFindSelectedTicket, setQuickFindSelectedTicket] = useState<string | undefined>();
+  const [quickFindSelectedPR, setQuickFindSelectedPR] = useState<any | undefined>();
+  const [quickFindInvalidJiraIds, setQuickFindInvalidJiraIds] = useState<string[]>([]);
 
   const handleTicketSelect = (ticketKey: string) => {
     setSelectedTicket(ticketKey);
@@ -116,6 +129,59 @@ const SplitPanel: React.FC<SplitPanelProps> = ({ currentTab }) => {
 
     return <EmptyState message="Right panel content" />;
   };
+
+  // Quick Find mode - render special panels
+  if (quickFindMode) {
+    if (quickFindMode.type === 'jira') {
+      return (
+        <div 
+          className={`split-panel ${isDragging ? 'dragging' : ''}`}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          <div className="panel left-panel" style={{ width: `${leftWidth}%` }}>
+            <QuickFindJiraPanel 
+              jiraId={quickFindMode.value} 
+              onTicketFound={setQuickFindSelectedTicket}
+            />
+          </div>
+          <div className="resize-handle" onMouseDown={handleMouseDown}>
+            <div className="resize-handle-line"></div>
+          </div>
+          <div className="panel right-panel" style={{ width: `${100 - leftWidth}%` }}>
+            <AssociatedPRsPanel selectedTicket={quickFindSelectedTicket} />
+          </div>
+        </div>
+      );
+    } else if (quickFindMode.type === 'pr') {
+      return (
+        <div 
+          className={`split-panel ${isDragging ? 'dragging' : ''}`}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          <div className="panel left-panel" style={{ width: `${leftWidth}%` }}>
+            <QuickFindPRPanel 
+              prNumber={parseInt(quickFindMode.value, 10)} 
+              onPRFound={setQuickFindSelectedPR}
+              invalidJiraIds={quickFindInvalidJiraIds}
+            />
+          </div>
+          <div className="resize-handle" onMouseDown={handleMouseDown}>
+            <div className="resize-handle-line"></div>
+          </div>
+          <div className="panel right-panel" style={{ width: `${100 - leftWidth}%` }}>
+            <AssociatedJirasPanel 
+              selectedPR={quickFindSelectedPR} 
+              onInvalidJiraIds={setQuickFindInvalidJiraIds} 
+            />
+          </div>
+        </div>
+      );
+    }
+  }
 
   // Feature Flags tab renders as full-width panel (no split)
   if (currentTab === 'feature-flags') {

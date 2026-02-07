@@ -13,10 +13,16 @@ import './styles/App.css';
 // Tab types for the application
 export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'reviewers' | 'feature-flags' | 'doc-links' | 'epics';
 export type PrimaryTabType = 'jira' | 'github' | 'other';
+export type QuickFindType = 'jira' | 'pr';
 
 interface AppState {
   currentTab: TabType;
   primaryTab: PrimaryTabType;
+}
+
+interface QuickFindMode {
+  type: QuickFindType;
+  value: string;
 }
 
 const TAB_STORAGE_KEY = 'ocmui_current_tab';
@@ -84,6 +90,9 @@ export default function App() {
     return { currentTab: 'my-sprint-jiras', primaryTab: 'jira' };
   });
 
+  // Quick Find mode state
+  const [quickFindMode, setQuickFindMode] = useState<QuickFindMode | null>(null);
+
   // First-run identity check
   const [showFirstRun, setShowFirstRun] = useState(false);
   const [identityChecked, setIdentityChecked] = useState(false);
@@ -108,6 +117,7 @@ export default function App() {
       primaryTab: primary,
       currentTab: firstSecondary
     });
+    setQuickFindMode(null); // Clear quick find when switching tabs
     try {
       localStorage.setItem(TAB_STORAGE_KEY, firstSecondary);
     } catch {
@@ -121,11 +131,18 @@ export default function App() {
       ...prev,
       currentTab: tab
     }));
+    setQuickFindMode(null); // Clear quick find when switching tabs
     try {
       localStorage.setItem(TAB_STORAGE_KEY, tab);
     } catch {
       // ignore storage errors
     }
+  };
+
+  // Handle quick find
+  const handleQuickFind = (type: QuickFindType, value: string) => {
+    console.log(`🔍 Quick Find: ${type} = ${value}`);
+    setQuickFindMode({ type, value });
   };
 
   // Don't render app until we've checked identity status
@@ -144,10 +161,12 @@ export default function App() {
             currentSecondaryTab={appState.currentTab}
             onPrimaryTabChange={handlePrimaryTabChange}
             onSecondaryTabChange={handleSecondaryTabChange}
+            onQuickFind={handleQuickFind}
           />
           
           <SplitPanel
             currentTab={appState.currentTab}
+            quickFindMode={quickFindMode}
           />
           
           <SettingsModal />

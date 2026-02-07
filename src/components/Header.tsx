@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import NavigationTabs from './NavigationTabs';
+import QuickFindBar from './QuickFindBar';
 import TimeboardModal from './TimeboardModal';
 import type { TabType, PrimaryTabType } from '../App';
 import ocmuiLogo from '../assets/icon48.png';
+
+export type QuickFindType = 'jira' | 'pr';
 
 interface HeaderProps {
   primaryTabConfig: Array<{
@@ -16,6 +19,7 @@ interface HeaderProps {
   currentSecondaryTab: TabType;
   onPrimaryTabChange: (tab: PrimaryTabType) => void;
   onSecondaryTabChange: (tab: TabType) => void;
+  onQuickFind: (type: QuickFindType, value: string) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -24,7 +28,8 @@ const Header: React.FC<HeaderProps> = ({
   currentPrimaryTab, 
   currentSecondaryTab,
   onPrimaryTabChange,
-  onSecondaryTabChange
+  onSecondaryTabChange,
+  onQuickFind
 }) => {
   const { openSettingsModal, isConfigured } = useSettings();
   const [isTimeboardModalOpen, setIsTimeboardModalOpen] = useState(false);
@@ -37,6 +42,7 @@ const Header: React.FC<HeaderProps> = ({
             <img src={ocmuiLogo} alt="OCMUI Logo" className="logo-icon" />
             <h1 className="logo-text">My OCMUI Dashboard</h1>
           </div>
+          <QuickFindBar onFind={onQuickFind} />
         </div>
         
         <div className="header-center">

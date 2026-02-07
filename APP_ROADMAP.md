@@ -64,7 +64,7 @@ What Works
 - ✅ First-run "Who are you?" identity modal
 - ✅ Identity selection auto-fills GitHub/JIRA usernames
 - ✅ Token validation with auto-detection of user identity
-- ✅ Full dashboard functionality (My Sprint JIRAs, My PRs, My Code Reviews, JIRA Lookup)
+- ✅ Full dashboard functionality (My Sprint JIRAs, My PRs, My Code Reviews, Quick Find)
 - ✅ HTTPS via OpenShift Route with edge TLS termination
 
 Current Behavior (as of Phase 2.5)
@@ -232,14 +232,14 @@ What Was Implemented
 Tab Structure
 | Primary | Icon | Secondary Tabs |
 |---------|------|----------------|
-| JIRA | 🎫 | My Sprint JIRAs, JIRA Lookup, Epics |
+| JIRA | 🎫 | My Sprint JIRAs, Epics |
 | GitHub | 🐙 | My Code Reviews, My PRs, Reviewers |
 | Other | ••• | 🚩 Feature Flags, 🔗 Doc Links |
 
 Visual Layout
 ```
-🎫 JIRA [My Sprint JIRAs] [JIRA Lookup]  │  🐙 GitHub  │  ••• Other
-         └── active secondary tabs ──┘       └─ inactive (clickable) ─┘
+[Quick Find: ▾ Jira Id | input | Find]  🎫 JIRA [My Sprint JIRAs] [Epics]  🐙 GitHub  ••• Other
+                                                └── active secondary tabs ──┘
 ```
 
 Benefits
@@ -340,15 +340,16 @@ Current User Experience
 
 ---
 
-## Phase 9 – Reviewer Workload 🔄 IN PROGRESS
+## Phase 9 – Reviewer Workload ✅ COMPLETE
 
 Goal: Add a "Reviewers" subtab under "GitHub" to show team-wide code review workload distribution.
 
-**Status: In Progress (February 2026)**
+**Completed: February 2026**
 
-What Has Been Implemented
+What Was Implemented
 - New "Reviewers" tab under GitHub navigation (full-width panel, not split panel)
 - Server endpoint: `GET /api/github/reviewer-workload`
+  - **Scoped to `RedHatInsights/uhc-portal` repository only**
   - Fetches all team members with GitHub usernames from roster
   - For each member, queries GitHub for PRs where they are a requested reviewer
   - Categorizes by review state: Pending, Changes Requested, Commented, Approved
@@ -358,15 +359,47 @@ What Has Been Implemented
   - Zero values displayed as empty cells for cleaner look
 
 Current User Experience
-- ✅ Click "GitHub" → "Reviewers" to see team workload
+- ✅ Click "GitHub" → "Reviewers" to see team workload for uhc-portal
 - ✅ Table sorted by least pending (most available reviewers at top)
 - ✅ Warning shows devs missing GitHub usernames (with instructions to fix)
 - ✅ Click GitHub username to open their profile
 - ✅ Refresh button for manual update (5-minute auto-refresh)
 
-Pending
-- [ ] Deploy to ROSA cluster and verify with full team roster
-- [ ] User feedback and iteration
+---
+
+## Phase 10 – Quick Find & Navigation Improvements ✅ COMPLETE
+
+Goal: Add Quick Find feature to header and improve navigation styling.
+
+**Completed: February 2026**
+
+What Was Implemented
+- **Quick Find bar** in header (between title and navigation tabs)
+  - Dropdown to select "Jira Id:" or "PR #:"
+  - Input field with placeholder based on selection
+  - "Find" button to execute lookup
+  - Pressing Enter also submits
+- **Quick Find JIRA mode**: Displays JiraCard in left panel, associated PRs automatically load in right panel
+- **Quick Find PR mode**: Displays PRCard in left panel, associated JIRAs automatically load in right panel
+  - PR lookup scoped to `RedHatInsights/uhc-portal` repository
+- **Removed JIRA Lookup tab** from JIRA secondary tabs (functionality replaced by Quick Find)
+- **Navigation styling improvements**:
+  - Primary and secondary tabs use underline styling instead of boxes
+  - Active primary tab has magenta underline with rounded left border
+  - Active secondary tab has blue underline
+  - Rounded corners on tab group borders
+  - Removed vertical bar delimiters between primary tab groups
+
+New Components
+- `QuickFindBar.tsx` - Header Quick Find UI component
+- `QuickFindJiraPanel.tsx` - Results panel for JIRA Quick Find
+- `QuickFindPRPanel.tsx` - Results panel for PR Quick Find
+
+Current User Experience
+- ✅ Quick Find in header for instant JIRA or PR lookup by ID
+- ✅ Associated items load automatically (no extra click required)
+- ✅ Clean underline-based navigation styling
+- ✅ Clicking a regular tab clears Quick Find mode
 
 ---
 
@@ -414,7 +447,8 @@ Notes
 - [x] Phase 6 two-level navigation - complete! 📑
 - [x] Phase 7 doc links health checker - complete! 🔗
 - [x] Phase 8 epics report - complete! 🟪
-- [ ] Phase 9 reviewer workload - in progress 👥
+- [x] Phase 9 reviewer workload - complete! 👥
+- [x] Phase 10 quick find & navigation improvements - complete! 🔍
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
 
 
@@ -453,7 +487,14 @@ Use this section to quickly navigate the codebase and implement each phase.
     - Reusable JIRA-style SVG priority icons (Blocker, Critical, Major, Normal, Minor, Trivial).
 - Reviewer Workload
   - `src/components/ReviewerWorkloadPanel.tsx`
-    - Team-wide review workload dashboard with summary cards and availability hints.
+    - Team-wide review workload dashboard for uhc-portal with summary cards and availability hints.
+- Quick Find
+  - `src/components/QuickFindBar.tsx`
+    - Header Quick Find UI with dropdown (Jira Id / PR #), input, and Find button.
+  - `src/components/QuickFindJiraPanel.tsx`
+    - Quick Find results for JIRA lookup; shows JiraCard + associated PRs.
+  - `src/components/QuickFindPRPanel.tsx`
+    - Quick Find results for PR lookup; shows PRCard + associated JIRAs.
 - Shared UI Components
   - `src/components/BasePanel.tsx`
     - Reusable panel wrapper with header, loading states, and refresh button.
@@ -499,7 +540,8 @@ Use this section to quickly navigate the codebase and implement each phase.
   - GET `/api/github/repos/:owner/:repo/issues/:issue_number/comments`
   - GET `/api/github/repos/:owner/:repo/commits/:ref/status`
   - GET `/api/github/repos/:owner/:repo/commits/:ref/check-runs`
-  - GET `/api/github/reviewer-workload` (team-wide review workload)
+  - GET `/api/github/reviewer-workload` (team review workload for uhc-portal)
+  - GET `/api/github/repos/:owner/:repo/pulls/:number` (single PR by number - used by Quick Find)
 - Browser → Express (JIRA proxy)
   - GET `/api/jira/status`
   - POST `/api/test-jira`

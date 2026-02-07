@@ -19,17 +19,18 @@ Before making changes, please read these files in order:
 - View your sprint JIRAs and associated PRs
 - View PRs awaiting your code review
 - View your own PRs with status badges
-- JIRA lookup with hierarchy visualization
-- **Reviewer Workload** - Team-wide code review load balancing (GitHub → Reviewers tab)
+- **Quick Find** - Header-based lookup for JIRA tickets or PRs by ID (auto-loads associated items)
+- **Reviewer Workload** - Team code review load balancing for uhc-portal (GitHub → Reviewers tab)
 - Feature Flags comparison (Unleash staging vs production)
 - Doc Links health checker (real-time URL validation from uhc-portal)
 - Team Timeboard with timezone support
 - Reviewer comment notifications with badges
 
 **Navigation**: Two-level inline grouped tabs
-- Primary: JIRA │ GitHub │ Other (category selectors)
+- Primary: JIRA, GitHub, Other (category selectors with underline styling)
 - Secondary: Subtabs appear inline when primary is active
-- JIRA tab includes: My Sprint JIRAs, JIRA Lookup, Epics
+- **Quick Find bar** in header between title and tabs
+- JIRA tab includes: My Sprint JIRAs, Epics
 - GitHub tab includes: My Code Reviews, My PRs, Reviewers
 - Other tab includes: Feature Flags, Doc Links
 
@@ -61,16 +62,19 @@ Before making changes, please read these files in order:
 ```
 src/
 ├── components/          # React components
-│   ├── App.tsx         # Main app, tab routing
-│   ├── Header.tsx      # Top navigation header
-│   ├── NavigationTabs.tsx  # Two-level inline grouped tabs (JIRA│GitHub│Other)
+│   ├── App.tsx         # Main app, tab routing, quick find state
+│   ├── Header.tsx      # Top navigation header with Quick Find bar
+│   ├── QuickFindBar.tsx    # Header Quick Find (JIRA/PR lookup)
+│   ├── QuickFindJiraPanel.tsx  # Quick Find results for JIRA lookup
+│   ├── QuickFindPRPanel.tsx    # Quick Find results for PR lookup
+│   ├── NavigationTabs.tsx  # Two-level inline grouped tabs
 │   ├── SplitPanel.tsx  # Left/right panel layout + full-width panels
 │   ├── JiraPanel.tsx   # Sprint JIRAs list
 │   ├── PRPanel.tsx     # PRs list (reviews or own)
 │   ├── JiraCard.tsx    # Individual JIRA card
 │   ├── PRCard.tsx      # Individual PR card
 │   ├── EpicsPanel.tsx  # Full-width Epics table with filters, "last updated by" info
-│   ├── ReviewerWorkloadPanel.tsx  # Team review workload dashboard
+│   ├── ReviewerWorkloadPanel.tsx  # Team review workload dashboard (uhc-portal)
 │   ├── FeatureFlagsPanel.tsx  # Unleash comparison
 │   ├── DocLinksPanel.tsx      # Doc Links health checker
 │   ├── TimeboardModal.tsx     # Team timezone dashboard

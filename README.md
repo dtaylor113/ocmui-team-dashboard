@@ -7,8 +7,9 @@
 
 - **🔗 GitHub Integration**: Track PRs, code reviews, and repository activity
 - **📋 JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
+- **🔍 Quick Find**: Header-based lookup for JIRA tickets or PRs by ID (auto-loads associated items)
 - **🟪 Epics Dashboard**: Team-wide view of active epics with filters, sortable columns, editable Marketing Impact Notes, "Last updated by" info
-- **👥 Reviewer Workload**: See team's code review distribution to balance workload (sorted by availability)
+- **👥 Reviewer Workload**: See team's code review distribution for uhc-portal (sorted by availability)
 - **🩺 Doc Links Health Checker**: Real-time validation of uhc-portal documentation URLs
 - **Jira Hierarchy View**: Click any JIRA card to see a popup containing a hierarchy tree of all of it's parents.
 <img src="src/assets/JiraHierarchyPopup.png" alt="JIRA Hierarchy Popup" width="600">
@@ -33,13 +34,14 @@ The header uses an **inline grouped navigation** with primary categories and the
 
 | Primary Tab | Secondary Tabs | Description |
 |-------------|----------------|-------------|
-| **🎫 JIRA** | My Sprint JIRAs, JIRA Lookup, Epics | JIRA ticket management, team epics view |
+| **🎫 JIRA** | My Sprint JIRAs, Epics | JIRA ticket management, team epics view |
 | **🐙 GitHub** | My Code Reviews, My PRs, Reviewers | GitHub PR tracking, team workload |
 | **••• Other** | 🚩 Feature Flags, 🔗 Doc Links | Unleash feature flags, URL health checker |
 
+- **Quick Find bar** in header allows instant lookup of JIRA tickets or PRs by ID
 - Click a **primary tab** to switch categories and reveal its subtabs
 - Click a **secondary tab** to switch views within that category
-- Active primary tab is highlighted; inactive tabs are dimmed but clickable
+- Active primary tab has underline styling with rounded left border; secondary tabs have underline styling
 
 ### Key Features
 - **Auto-Association**: Click any JIRA to see related PRs, or any PR to see related JIRAs

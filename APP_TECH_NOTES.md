@@ -60,7 +60,7 @@ server/index.js (ESM)
 - GET  /api/github/repos/:owner/:repo/pulls/:number/requested_reviewers
 - GET  /api/github/repos/:owner/:repo/issues/:number/comments
 - GET  /api/github/repos/:owner/:repo/commits/:ref/status    # CI status
-- GET  /api/github/reviewer-workload                         # Team review workload (pending/approved/etc.)
+- GET  /api/github/reviewer-workload                         # Team review workload for uhc-portal (pending/approved/etc.)
 
 # Unleash Proxy Endpoints (use UNLEASH_STAGING_TOKEN, UNLEASH_PROD_TOKEN env vars)
 - GET  /api/unleash/status                                   # Check if Unleash tokens are configured
@@ -93,26 +93,30 @@ Users only need to provide their **username** (GitHub) and **email** (JIRA) to f
 ## 🎨 User Interface & Features
 
 ### Navigation System
-- Single-row header with logo, navigation tabs, timeboard, and settings
+- Single-row header with logo, Quick Find bar, navigation tabs, timeboard, and settings
+- **Quick Find bar** in header (between title and navigation):
+  - Dropdown: "Jira Id:" or "PR #:"
+  - Input field and Find button
+  - Instantly looks up JIRA ticket or PR with associated items
 - **Two-level inline grouped navigation**:
-  - **Primary tabs**: JIRA, GitHub, Other (clickable category selectors)
-  - **Secondary tabs**: Appear inline next to active primary tab
-  - Layout: `🎫 JIRA [My Sprint JIRAs] [JIRA Lookup]  │  🐙 GitHub  │  ••• Other`
+  - **Primary tabs**: JIRA, GitHub, Other (underline styling with rounded left border)
+  - **Secondary tabs**: Appear inline next to active primary tab (underline styling)
+  - Layout: `[Quick Find] 🎫 JIRA [My Sprint JIRAs] [Epics]  🐙 GitHub  ••• Other`
 - Tab structure:
   | Primary | Secondary Tabs |
   |---------|----------------|
-  | JIRA | My Sprint JIRAs, JIRA Lookup, Epics |
+  | JIRA | My Sprint JIRAs, Epics |
   | GitHub | My Code Reviews, My PRs, Reviewers |
   | Other | 🚩 Feature Flags, 🔗 Doc Links |
 - Team Timeboard: Globe button opens team timezone dashboard
 
 ### Core Panels
 - **My Sprint JIRAs**: All tickets for current sprint; sorted by last update; refresh button
-- **JIRA Lookup**: Prefix + number input, recent history, instant associated PRs
+- **Quick Find** (header): Dropdown (Jira Id / PR #) + input + Find button; displays results in split panel with associated items auto-loaded
 - **Epics**: Full-width team epics table; filters (In-Progress/Planning/All/Blocked); sortable/resizable columns; status counter badges; editable Marketing Impact Notes; expandable child issues; parent links with status; "Last updated by" info on Key and Parent columns
 - **My Code Reviews**: PRs requesting your review; reviewer comments modal; refresh button
 - **My PRs**: Open/closed toggle, associated JIRA detection, status badges; refresh button
-- **Reviewers**: Team review workload distribution; sorted by least pending (most available at top); warning for missing GitHub usernames
+- **Reviewers**: Team review workload for uhc-portal repo; sorted by least pending (most available at top); warning for missing GitHub usernames
 - **Associated Panels (Right Side)**: Linked PRs for a JIRA; linked JIRAs for a PR
 - **Feature Flags**: Unleash dashboard comparing staging vs production; summary cards; search/filter; "In Code?" column shows if flag is defined in codebase; last modified info from production environment
 - **Doc Links**: Real-time URL health checker for uhc-portal documentation links; categorized results (success/redirect/client error/server error)
