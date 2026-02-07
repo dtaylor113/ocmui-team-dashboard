@@ -24,14 +24,12 @@ const NavigationTabs: React.FC<NavigationTabsProps> = ({
 }) => {
   return (
     <nav className="navigation navigation-inline">
-      {primaryTabConfig.map((primary, index) => {
+      {primaryTabConfig.map((primary) => {
         const secondaryTabs = secondaryTabConfig[primary.id];
         const isActive = currentPrimaryTab === primary.id;
         
         return (
           <React.Fragment key={primary.id}>
-            {/* Divider between groups */}
-            {index > 0 && <span className="nav-divider">│</span>}
             
             <div className="nav-group">
               {/* Primary tab button - always visible */}
