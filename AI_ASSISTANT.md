@@ -70,7 +70,7 @@ src/
 │   ├── JiraCard.tsx    # Individual JIRA card
 │   ├── PRCard.tsx      # Individual PR card
 │   ├── EpicsPanel.tsx  # Full-width Epics table with filters, "last updated by" info
-│   ├── ReviewerWorkloadPanel.tsx  # Team review workload dashboard (top 2 highlighted)
+│   ├── ReviewerWorkloadPanel.tsx  # Team review workload dashboard
 │   ├── FeatureFlagsPanel.tsx  # Unleash comparison
 │   ├── DocLinksPanel.tsx      # Doc Links health checker
 │   ├── TimeboardModal.tsx     # Team timezone dashboard

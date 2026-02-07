@@ -112,7 +112,7 @@ Users only need to provide their **username** (GitHub) and **email** (JIRA) to f
 - **Epics**: Full-width team epics table; filters (In-Progress/Planning/All/Blocked); sortable/resizable columns; status counter badges; editable Marketing Impact Notes; expandable child issues; parent links with status; "Last updated by" info on Key and Parent columns
 - **My Code Reviews**: PRs requesting your review; reviewer comments modal; refresh button
 - **My PRs**: Open/closed toggle, associated JIRA detection, status badges; refresh button
-- **Reviewers**: Team review workload distribution; summary cards (pending/changes requested/commented/approved); availability hints; top 2 available highlighted in green; warning for missing GitHub usernames
+- **Reviewers**: Team review workload distribution; sorted by least pending (most available at top); warning for missing GitHub usernames
 - **Associated Panels (Right Side)**: Linked PRs for a JIRA; linked JIRAs for a PR
 - **Feature Flags**: Unleash dashboard comparing staging vs production; summary cards; search/filter; "In Code?" column shows if flag is defined in codebase; last modified info from production environment
 - **Doc Links**: Real-time URL health checker for uhc-portal documentation links; categorized results (success/redirect/client error/server error)

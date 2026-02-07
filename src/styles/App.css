@@ -6608,61 +6608,6 @@ body.dark-theme .github-image-fallback:hover {
   margin-top: 8px;
 }
 
-/* Summary Cards */
-.workload-summary {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.workload-summary .summary-card {
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 16px;
-  text-align: center;
-  transition: all 0.2s;
-}
-
-.workload-summary .summary-card:hover {
-  border-color: #444;
-}
-
-.workload-summary .summary-card .summary-value {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.workload-summary .summary-card .summary-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #e5e7eb;
-  margin-bottom: 2px;
-}
-
-.workload-summary .summary-card .summary-hint {
-  font-size: 11px;
-  color: #6b7280;
-}
-
-.workload-summary .summary-card.pending .summary-value {
-  color: #f59e0b;
-}
-
-.workload-summary .summary-card.changes-requested .summary-value {
-  color: #ef4444;
-}
-
-.workload-summary .summary-card.commented .summary-value {
-  color: #3b82f6;
-}
-
-.workload-summary .summary-card.approved .summary-value {
-  color: #22c55e;
-}
-
 /* Missing GitHub Warning */
 .missing-github-warning {
   display: flex;
@@ -6701,31 +6646,6 @@ body.dark-theme .github-image-fallback:hover {
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
-}
-
-/* Availability Hint */
-.availability-hint {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: #1a2a1a;
-  border: 1px solid #2d4a2d;
-  border-radius: 8px;
-  margin-bottom: 20px;
-}
-
-.availability-hint .hint-icon {
-  font-size: 18px;
-}
-
-.availability-hint .hint-text {
-  font-size: 13px;
-  color: #a3d9a3;
-}
-
-.availability-hint .hint-text strong {
-  color: #4ade80;
 }
 
 /* Workload Table */
@@ -6768,14 +6688,6 @@ body.dark-theme .github-image-fallback:hover {
 
 .workload-table .name-cell {
   font-weight: 500;
-}
-
-.workload-table tr.top-available {
-  background: rgba(34, 197, 94, 0.08);
-}
-
-.workload-table tr.top-available:hover {
-  background: rgba(34, 197, 94, 0.12);
 }
 
 .workload-table .github-cell {
@@ -6830,17 +6742,7 @@ body.dark-theme .github-image-fallback:hover {
 }
 
 /* Responsive */
-@media (max-width: 1200px) {
-  .workload-summary {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
-  .workload-summary {
-    grid-template-columns: 1fr;
-  }
-  
   .reviewer-workload-panel {
     padding: 16px;
   }

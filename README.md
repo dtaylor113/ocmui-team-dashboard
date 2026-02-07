@@ -8,7 +8,7 @@
 - **🔗 GitHub Integration**: Track PRs, code reviews, and repository activity
 - **📋 JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
 - **🟪 Epics Dashboard**: Team-wide view of active epics with filters, sortable columns, editable Marketing Impact Notes, "Last updated by" info
-- **👥 Reviewer Workload**: See team's code review distribution to balance workload (top 2 available highlighted)
+- **👥 Reviewer Workload**: See team's code review distribution to balance workload (sorted by availability)
 - **🩺 Doc Links Health Checker**: Real-time validation of uhc-portal documentation URLs
 - **Jira Hierarchy View**: Click any JIRA card to see a popup containing a hierarchy tree of all of it's parents.
 <img src="src/assets/JiraHierarchyPopup.png" alt="JIRA Hierarchy Popup" width="600">

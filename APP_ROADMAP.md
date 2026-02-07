@@ -352,21 +352,14 @@ What Has Been Implemented
   - Fetches all team members with GitHub usernames from roster
   - For each member, queries GitHub for PRs where they are a requested reviewer
   - Categorizes by review state: Pending, Changes Requested, Commented, Approved
-- Summary cards showing totals across team:
-  - Pending Reviews (awaiting first review)
-  - Changes Requested (may need re-review)
-  - Commented (engaged, no decision)
-  - Approved (review complete)
-- Availability hint: Shows who has lightest load and who has most pending
 - Warning for team members missing GitHub usernames
 - Table with columns: Team Member, GitHub (linked), Pending, Changes Req., Commented, Approved, Total
-- **Top 2 available reviewers highlighted** with green row background for quick identification
+  - Sorted by least pending PRs (most available at top)
+  - Zero values displayed as empty cells for cleaner look
 
 Current User Experience
 - ✅ Click "GitHub" → "Reviewers" to see team workload
-- ✅ Summary cards show total counts per category
-- ✅ Top 2 most available reviewers highlighted with green background
-- ✅ Availability hint suggests who to assign new reviews to
+- ✅ Table sorted by least pending (most available reviewers at top)
 - ✅ Warning shows devs missing GitHub usernames (with instructions to fix)
 - ✅ Click GitHub username to open their profile
 - ✅ Refresh button for manual update (5-minute auto-refresh)

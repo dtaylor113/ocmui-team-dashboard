@@ -62,6 +62,12 @@ if [ -z "$REGISTRY" ]; then
 fi
 echo -e "${GREEN}✓ Registry: ${REGISTRY}${NC}"
 
+# Login to registry (tokens expire, so always re-login)
+echo ""
+echo -e "${YELLOW}▶ Logging into OpenShift registry...${NC}"
+podman login -u $(oc whoami) -p $(oc whoami -t) ${REGISTRY} --tls-verify=false 2>/dev/null
+echo -e "${GREEN}✓ Registry login successful${NC}"
+
 # Build step (unless --skip-build)
 if [ "$1" != "--skip-build" ]; then
     echo ""
