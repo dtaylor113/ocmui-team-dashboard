@@ -4,8 +4,8 @@
 
 ## 📋 Project Summary
 
-- **GitHub Integration**: Track PRs, code reviews, and repository activity
-- **JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
+- **GitHub Integration**: Track PRs, code reviews, repository activity, and team review workload
+- **JIRA Integration**: Manage sprint tickets, view descriptions, comments, and team epics
 - **Unified Dashboard**: Single interface combining both platforms with auto-associations
 - **Developer Productivity**: Reduce context switching between GitHub and JIRA
 
@@ -48,6 +48,8 @@ server/index.js (ESM)
 - POST /api/jira-ticket        # Single JIRA ticket lookup
 - POST /api/jira-sprint-tickets # Sprint JIRAs for user
 - POST /api/jira-child-issues  # Child issues for Epic/Feature/parent (JQL-based)
+- POST /api/jira-epics         # Team epics with filter (in-progress, planning, all, blocked)
+- POST /api/jira-update-field  # Update JIRA custom fields (Marketing Impact Notes, etc.)
 
 # GitHub Proxy Endpoints (use GITHUB_TOKEN env var)
 - GET  /api/github/status                                    # Check if GitHub service account is configured
@@ -58,6 +60,7 @@ server/index.js (ESM)
 - GET  /api/github/repos/:owner/:repo/pulls/:number/requested_reviewers
 - GET  /api/github/repos/:owner/:repo/issues/:number/comments
 - GET  /api/github/repos/:owner/:repo/commits/:ref/status    # CI status
+- GET  /api/github/reviewer-workload                         # Team review workload (pending/approved/etc.)
 
 # Unleash Proxy Endpoints (use UNLEASH_STAGING_TOKEN, UNLEASH_PROD_TOKEN env vars)
 - GET  /api/unleash/status                                   # Check if Unleash tokens are configured
@@ -98,16 +101,18 @@ Users only need to provide their **username** (GitHub) and **email** (JIRA) to f
 - Tab structure:
   | Primary | Secondary Tabs |
   |---------|----------------|
-  | JIRA | My Sprint JIRAs, JIRA Lookup |
-  | GitHub | My Code Reviews, My PRs |
+  | JIRA | My Sprint JIRAs, JIRA Lookup, Epics |
+  | GitHub | My Code Reviews, My PRs, Reviewers |
   | Other | 🚩 Feature Flags, 🔗 Doc Links |
 - Team Timeboard: Globe button opens team timezone dashboard
 
 ### Core Panels
 - **My Sprint JIRAs**: All tickets for current sprint; sorted by last update; refresh button
 - **JIRA Lookup**: Prefix + number input, recent history, instant associated PRs
+- **Epics**: Full-width team epics table; filters (In-Progress/Planning/All/Blocked); sortable/resizable columns; status counter badges; editable Marketing Impact Notes; expandable child issues; parent links with status; "Last updated by" info on Key and Parent columns
 - **My Code Reviews**: PRs requesting your review; reviewer comments modal; refresh button
 - **My PRs**: Open/closed toggle, associated JIRA detection, status badges; refresh button
+- **Reviewers**: Team review workload distribution; summary cards (pending/changes requested/commented/approved); availability hints; top 2 available highlighted in green; warning for missing GitHub usernames
 - **Associated Panels (Right Side)**: Linked PRs for a JIRA; linked JIRAs for a PR
 - **Feature Flags**: Unleash dashboard comparing staging vs production; summary cards; search/filter; "In Code?" column shows if flag is defined in codebase; last modified info from production environment
 - **Doc Links**: Real-time URL health checker for uhc-portal documentation links; categorized results (success/redirect/client error/server error)
@@ -375,16 +380,18 @@ GITHUB_TOKEN=ghp_xxx JIRA_TOKEN=xxx yarn start
 
 # Available scripts
 yarn start       # Build + serve from Express (add env vars for full functionality)
-yarn start:dev   # Express API + Vite dev server (hot reload)
+yarn start:dev   # Express API (nodemon) + Vite dev server (hot reload for both)
 yarn build       # Production build
 yarn dev         # Vite dev server only
 yarn start:api   # API server only (no frontend)
 yarn lint        # ESLint
 yarn preview     # Preview production build
-
-# Note: The Express server does not auto-restart on changes. 
-# Restart manually or use a watcher like nodemon.
 ```
+
+**Development mode (`yarn start:dev`)**:
+- Uses `nodemon` to auto-restart Express server on file changes
+- Uses Vite dev server with HMR for React
+- Vite proxies `/api/*` requests to Express on port 3017
 
 ### Environment Variables
 

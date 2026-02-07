@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSettings } from '../contexts/SettingsContext';
 
 // Query keys for different data types
@@ -7,9 +7,11 @@ export const queryKeys = {
   mySprintJiras: ['jira', 'sprint-tickets'] as const,
   jiraTicket: (jiraId: string) => ['jira', 'ticket', jiraId] as const,
   jiraChildIssues: (parentKey: string) => ['jira', 'child-issues', parentKey] as const,
+  epics: (filter: 'in-progress' | 'planning' | 'all' | 'blocked') => ['jira', 'epics', filter] as const,
   myCodeReviews: ['github', 'code-reviews'] as const,
   myPRs: (status: 'open' | 'closed') => ['github', 'my-prs', status] as const,
   prConversation: (repoName: string, prNumber: number) => ['github', 'pr-conversation', repoName, prNumber] as const,
+  reviewerWorkload: ['github', 'reviewer-workload'] as const,
 };
 
 // Types for our API responses
@@ -24,6 +26,7 @@ interface JiraTicket {
   type: string;
   created: string;
   updated: string;
+  lastUpdatedBy?: string | null;
   duedate?: string | null;
   sprint?: string;
 }
@@ -927,6 +930,58 @@ export const usePRConversation = (repoName: string, prNumber: number) => {
   });
 };
 
+// Epics types
+interface Epic {
+  key: string;
+  summary: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  targetEnd: string | null;
+  updated: string | null;
+  lastUpdatedBy: string | null;
+  marketingImpactNotes: string | null;
+  blockedReason: string | null;
+  parentKey: string | null;
+  featureKey: string | null;
+}
+
+interface EpicsResponse {
+  success: boolean;
+  epics: Epic[];
+  total: number;
+  filter: string;
+  jqlQuery: string;
+}
+
+// Fetch epics from JIRA
+const fetchEpics = async (filter: 'in-progress' | 'planning' | 'all' | 'blocked'): Promise<EpicsResponse> => {
+  const response = await fetch('/api/jira-epics', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ filter }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch epics: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// Hook to fetch epics with filter
+export const useEpics = (filter: 'in-progress' | 'planning' | 'all' | 'blocked' = 'in-progress') => {
+  return useQuery({
+    queryKey: queryKeys.epics(filter),
+    queryFn: () => fetchEpics(filter),
+    refetchInterval: 5 * 60 * 1000, // Every 5 minutes
+    refetchIntervalInBackground: true,
+    retry: 3,
+  });
+};
+
 // Helper hook to format last updated timestamp
 export const useLastUpdatedFormat = (dataUpdatedAt?: number) => {
   const [, setTick] = useState(0);
@@ -952,4 +1007,86 @@ export const useLastUpdatedFormat = (dataUpdatedAt?: number) => {
   if (diffMinutes < 60) return `${diffMinutes}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   return new Date(dataUpdatedAt).toLocaleDateString();
+};
+
+// Update JIRA field mutation
+interface UpdateJiraFieldParams {
+  issueKey: string;
+  fieldId: string;
+  value: string | null;
+}
+
+const updateJiraField = async ({ issueKey, fieldId, value }: UpdateJiraFieldParams): Promise<{ success: boolean }> => {
+  const response = await fetch('/api/jira-update-field', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ issueKey, fieldId, value }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.details || error.error || 'Failed to update field');
+  }
+
+  return response.json();
+};
+
+export const useUpdateJiraField = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: updateJiraField,
+    onSuccess: () => {
+      // Invalidate epics queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['jira', 'epics'] });
+    },
+  });
+};
+
+// ============================================================================
+// REVIEWER WORKLOAD TYPES AND HOOKS
+// ============================================================================
+
+export interface ReviewerWorkloadMember {
+  name: string;
+  github: string;
+  pending: number;
+  changesRequested: number;
+  commented: number;
+  approved: number;
+  total: number;
+  error?: string;
+}
+
+interface ReviewerWorkloadResponse {
+  success: boolean;
+  members: ReviewerWorkloadMember[];
+  timestamp: string;
+  message?: string;
+}
+
+// Fetch reviewer workload from server
+const fetchReviewerWorkload = async (): Promise<ReviewerWorkloadResponse> => {
+  const response = await fetch('/api/github/reviewer-workload');
+
+  if (!response.ok) {
+    if (response.status === 503) {
+      throw new Error('GitHub service not available. Server may not have GitHub token configured.');
+    }
+    throw new Error(`Failed to fetch reviewer workload: ${response.status}`);
+  }
+
+  return response.json();
+};
+
+// Hook to fetch reviewer workload for all team members
+export const useReviewerWorkload = () => {
+  return useQuery({
+    queryKey: queryKeys.reviewerWorkload,
+    queryFn: fetchReviewerWorkload,
+    refetchInterval: 5 * 60 * 1000, // Every 5 minutes (this endpoint is expensive)
+    refetchIntervalInBackground: false, // Don't refresh in background due to API cost
+    staleTime: 3 * 60 * 1000, // Consider data stale after 3 minutes
+    retry: 2,
+  });
 };

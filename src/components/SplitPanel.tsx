@@ -8,6 +8,8 @@ import JiraLookupPanel from './JiraLookupPanel';
 import AssociatedJirasPanel from './AssociatedJirasPanel';
 import FeatureFlagsPanel from './FeatureFlagsPanel';
 import DocLinksPanel from './DocLinksPanel';
+import EpicsPanel from './EpicsPanel';
+import ReviewerWorkloadPanel from './ReviewerWorkloadPanel';
 
 interface SplitPanelProps {
   currentTab: TabType;
@@ -48,8 +50,8 @@ const SplitPanel: React.FC<SplitPanelProps> = ({ currentTab }) => {
       setSelectedPR(undefined);
       setSelectedTicket(undefined); // Clear JIRA ticket selection to prevent stale Associated PRs
       setInvalidJiraIds([]); // Clear invalid JIRA IDs when switching tabs
-    } else if (currentTab === 'feature-flags' || currentTab === 'doc-links') {
-      // Feature flags and Doc Links tabs - clear all selections
+    } else if (currentTab === 'feature-flags' || currentTab === 'doc-links' || currentTab === 'epics' || currentTab === 'reviewers') {
+      // Feature flags, Doc Links, Epics, and Reviewers tabs - clear all selections
       setSelectedPR(undefined);
       setSelectedTicket(undefined);
       setInvalidJiraIds([]);
@@ -133,6 +135,24 @@ const SplitPanel: React.FC<SplitPanelProps> = ({ currentTab }) => {
     return (
       <div className="full-panel">
         <DocLinksPanel />
+      </div>
+    );
+  }
+
+  // Epics tab renders as full-width panel (no split)
+  if (currentTab === 'epics') {
+    return (
+      <div className="full-panel">
+        <EpicsPanel />
+      </div>
+    );
+  }
+
+  // Reviewers tab renders as full-width panel (no split)
+  if (currentTab === 'reviewers') {
+    return (
+      <div className="full-panel">
+        <ReviewerWorkloadPanel />
       </div>
     );
   }

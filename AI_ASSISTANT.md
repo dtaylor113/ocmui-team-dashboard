@@ -20,6 +20,7 @@ Before making changes, please read these files in order:
 - View PRs awaiting your code review
 - View your own PRs with status badges
 - JIRA lookup with hierarchy visualization
+- **Reviewer Workload** - Team-wide code review load balancing (GitHub → Reviewers tab)
 - Feature Flags comparison (Unleash staging vs production)
 - Doc Links health checker (real-time URL validation from uhc-portal)
 - Team Timeboard with timezone support
@@ -28,6 +29,8 @@ Before making changes, please read these files in order:
 **Navigation**: Two-level inline grouped tabs
 - Primary: JIRA │ GitHub │ Other (category selectors)
 - Secondary: Subtabs appear inline when primary is active
+- JIRA tab includes: My Sprint JIRAs, JIRA Lookup, Epics
+- GitHub tab includes: My Code Reviews, My PRs, Reviewers
 - Other tab includes: Feature Flags, Doc Links
 
 **Live URL**: `https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com`
@@ -61,11 +64,13 @@ src/
 │   ├── App.tsx         # Main app, tab routing
 │   ├── Header.tsx      # Top navigation header
 │   ├── NavigationTabs.tsx  # Two-level inline grouped tabs (JIRA│GitHub│Other)
-│   ├── SplitPanel.tsx  # Left/right panel layout
+│   ├── SplitPanel.tsx  # Left/right panel layout + full-width panels
 │   ├── JiraPanel.tsx   # Sprint JIRAs list
 │   ├── PRPanel.tsx     # PRs list (reviews or own)
 │   ├── JiraCard.tsx    # Individual JIRA card
 │   ├── PRCard.tsx      # Individual PR card
+│   ├── EpicsPanel.tsx  # Full-width Epics table with filters, "last updated by" info
+│   ├── ReviewerWorkloadPanel.tsx  # Team review workload dashboard (top 2 highlighted)
 │   ├── FeatureFlagsPanel.tsx  # Unleash comparison
 │   ├── DocLinksPanel.tsx      # Doc Links health checker
 │   ├── TimeboardModal.tsx     # Team timezone dashboard
@@ -78,6 +83,8 @@ src/
 │   └── useApiQueries.ts     # All API calls (GitHub, JIRA, Unleash)
 ├── styles/
 │   └── App.css              # All styles (single file)
+├── utils/
+│   └── priorityIcons.tsx    # JIRA-style SVG priority icons
 └── types/
     └── settings.ts          # TypeScript interfaces
 
@@ -186,6 +193,7 @@ export const useMyData = () => {
 3. Optionally add an icon: `{ id: 'my-tab', label: 'My Tab', icon: myIcon }`
 4. Create panel component
 5. Add rendering case in `SplitPanel.tsx`
+6. For full-width panels (like Epics, Reviewers), wrap in `<div className="full-panel">`
 
 **Example**: To add "Sprint Report" under "Other":
 ```typescript
@@ -196,6 +204,8 @@ other: [
   { id: 'sprint-report', label: 'Sprint Report' }  // New tab
 ]
 ```
+
+**Recent examples**: `EpicsPanel.tsx` (full-width table under JIRA), `ReviewerWorkloadPanel.tsx` (full-width under GitHub)
 
 ## 🚀 Deployment Checklist
 
@@ -241,4 +251,4 @@ When working on this codebase:
 
 ---
 
-*Last updated: February 2026*
+*Last updated: February 7, 2026*

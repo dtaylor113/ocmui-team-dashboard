@@ -232,8 +232,8 @@ What Was Implemented
 Tab Structure
 | Primary | Icon | Secondary Tabs |
 |---------|------|----------------|
-| JIRA | 🎫 | My Sprint JIRAs, JIRA Lookup |
-| GitHub | 🐙 | My Code Reviews, My PRs |
+| JIRA | 🎫 | My Sprint JIRAs, JIRA Lookup, Epics |
+| GitHub | 🐙 | My Code Reviews, My PRs, Reviewers |
 | Other | ••• | 🚩 Feature Flags, 🔗 Doc Links |
 
 Visual Layout
@@ -287,6 +287,96 @@ Environment Variables
 
 ---
 
+## Phase 8 – Epics Report ✅ COMPLETE
+
+Goal: Add an "Epics" subtab under "JIRA" to provide a team-wide view of active Epics matching the external JIRA dashboard.
+
+**Completed: February 2026**
+
+What Was Implemented
+- New "Epics" tab under JIRA navigation (full-width table layout, not split panel)
+- Server endpoints:
+  - `POST /api/jira-epics` - Fetches epics with filter support
+  - `POST /api/jira-update-field` - Updates JIRA custom fields (for Marketing Impact Notes edit)
+- Four filter modes (all scoped to `project = OCMUI`):
+  - **In-Progress** (default): `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "False" AND status in ("In Progress", "Code Review", "Review") ORDER BY priority DESC, "Target end" ASC`
+  - **Planning**: `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "False" AND status in ("New", "Refinement", "Backlog", "To Do") ORDER BY priority DESC, "Target end" ASC`
+  - **All**: `project = OCMUI AND issuetype = Epic AND Blocked = "False" AND (status != Closed OR resolved >= -90d) ORDER BY priority DESC, "Target end" ASC`
+  - **Blocked**: `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "True" ORDER BY priority DESC, "Target end" ASC`
+- Table features:
+  - Click-to-sort column headers (default sort: Target end ascending)
+  - Resizable columns with drag handles and `col-resize` cursor
+  - Status counter badges at top of each filter view (colored by status, sorted by count)
+  - JIRA-style priority icons (SVG-based, matching official JIRA icons)
+  - Columns: P (Priority), Key (linked), Summary (wraps), Status (badge), Assignee, Target End (child + parent), Parent (key + status), Marketing Impact Notes / Blocked Reason
+  - **"Last updated by" info**: Shows under Epic Key and Parent columns (two-line format: "Last updated by <name>" / "<time ago>")
+  - "Marketing Impact Notes" column with inline edit button → opens edit dialog
+  - "Blocked Reason" column shown only in Blocked mode (swaps with Marketing Impact Notes)
+  - Expandable rows showing child issues with vertical "Child Issues" label
+  - Child issues table: Key, Summary, Type, Status, Assignee, Last Updated (sorted by most recent)
+- Custom JIRA fields:
+  - `customfield_12319289` - Marketing Impact Notes
+  - `customfield_12316544` - Blocked Reason
+  - `customfield_12313942` - Target End
+  - `customfield_12313140` - Parent Link
+  - `customfield_12318341` - Feature Link
+- Hooks:
+  - `useEpics(filter)` - Fetches epics for the given filter
+  - `useUpdateJiraField()` - Mutation hook for updating JIRA fields
+- Utility:
+  - `src/utils/priorityIcons.tsx` - Reusable JIRA-style SVG priority icons
+
+Current User Experience
+- ✅ Click "JIRA" → "Epics" to see all team epics
+- ✅ Filter between In-Progress, Planning, All, and Blocked views
+- ✅ Status counter badges show counts per status at top of each view
+- ✅ Click column headers to sort (ascending/descending toggle)
+- ✅ Drag column edges to resize columns
+- ✅ Click expand button (▶) to see child issues (vertical "Child Issues" label)
+- ✅ Marketing Impact Notes editable inline (click edit icon → dialog → Save/Cancel)
+- ✅ Target End column shows both epic's date and parent's date (labeled "(Parent)")
+- ✅ Parent column shows parent key, status, and "Last updated by <name> / <time ago>"
+- ✅ Key column shows JIRA ID and "Last updated by <name> / <time ago>" below it
+
+---
+
+## Phase 9 – Reviewer Workload 🔄 IN PROGRESS
+
+Goal: Add a "Reviewers" subtab under "GitHub" to show team-wide code review workload distribution.
+
+**Status: In Progress (February 2026)**
+
+What Has Been Implemented
+- New "Reviewers" tab under GitHub navigation (full-width panel, not split panel)
+- Server endpoint: `GET /api/github/reviewer-workload`
+  - Fetches all team members with GitHub usernames from roster
+  - For each member, queries GitHub for PRs where they are a requested reviewer
+  - Categorizes by review state: Pending, Changes Requested, Commented, Approved
+- Summary cards showing totals across team:
+  - Pending Reviews (awaiting first review)
+  - Changes Requested (may need re-review)
+  - Commented (engaged, no decision)
+  - Approved (review complete)
+- Availability hint: Shows who has lightest load and who has most pending
+- Warning for team members missing GitHub usernames
+- Table with columns: Team Member, GitHub (linked), Pending, Changes Req., Commented, Approved, Total
+- **Top 2 available reviewers highlighted** with green row background for quick identification
+
+Current User Experience
+- ✅ Click "GitHub" → "Reviewers" to see team workload
+- ✅ Summary cards show total counts per category
+- ✅ Top 2 most available reviewers highlighted with green background
+- ✅ Availability hint suggests who to assign new reviews to
+- ✅ Warning shows devs missing GitHub usernames (with instructions to fix)
+- ✅ Click GitHub username to open their profile
+- ✅ Refresh button for manual update (5-minute auto-refresh)
+
+Pending
+- [ ] Deploy to ROSA cluster and verify with full team roster
+- [ ] User feedback and iteration
+
+---
+
 ## Branching and Repos
 
 **Current approach** (simplified):
@@ -330,6 +420,8 @@ Notes
 - [x] Phase 5.5 UX improvements - complete! ✨
 - [x] Phase 6 two-level navigation - complete! 📑
 - [x] Phase 7 doc links health checker - complete! 🔗
+- [x] Phase 8 epics report - complete! 🟪
+- [ ] Phase 9 reviewer workload - in progress 👥
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
 
 
@@ -360,6 +452,15 @@ Use this section to quickly navigate the codebase and implement each phase.
 - Doc Links
   - `src/components/DocLinksPanel.tsx`
     - Real-time URL health checker for uhc-portal documentation links.
+- Epics Report
+  - `src/components/EpicsPanel.tsx`
+    - Team-wide Epics table with filters, sortable/resizable columns, expandable child issues.
+    - Includes: status counter badges, edit modal for Marketing Impact Notes, vertical "Child Issues" label.
+  - `src/utils/priorityIcons.tsx`
+    - Reusable JIRA-style SVG priority icons (Blocker, Critical, Major, Normal, Minor, Trivial).
+- Reviewer Workload
+  - `src/components/ReviewerWorkloadPanel.tsx`
+    - Team-wide review workload dashboard with summary cards and availability hints.
 - Shared UI Components
   - `src/components/BasePanel.tsx`
     - Reusable panel wrapper with header, loading states, and refresh button.
@@ -405,12 +506,15 @@ Use this section to quickly navigate the codebase and implement each phase.
   - GET `/api/github/repos/:owner/:repo/issues/:issue_number/comments`
   - GET `/api/github/repos/:owner/:repo/commits/:ref/status`
   - GET `/api/github/repos/:owner/:repo/commits/:ref/check-runs`
+  - GET `/api/github/reviewer-workload` (team-wide review workload)
 - Browser → Express (JIRA proxy)
   - GET `/api/jira/status`
   - POST `/api/test-jira`
   - POST `/api/jira-ticket`
   - POST `/api/jira-sprint-tickets`
   - POST `/api/jira-child-issues`
+  - POST `/api/jira-epics`
+  - POST `/api/jira-update-field` (update Marketing Impact Notes, etc.)
 - Browser → Express (Unleash proxy)
   - GET `/api/unleash/status`
   - POST `/api/unleash/flags`

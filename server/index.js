@@ -435,7 +435,7 @@ app.post('/api/jira-ticket', async (req, res) => {
                         try {
                             const dueDateCandidates = [
                                 'duedate', // Standard due date
-                                'customfield_12313941', // Common Red Hat JIRA Target Date
+                                'customfield_12313942', // Red Hat JIRA Target end
                                 'customfield_12313940', // Alternative Target Date
                                 'customfield_12310243', // Another common target date field
                                 'customfield_12311940',
@@ -488,6 +488,14 @@ app.post('/api/jira-ticket', async (req, res) => {
                             console.warn(`⚠️ Error discovering target date for ${ticketData.key}:`, e.message);
                         }
                         
+                        // Get last updater from changelog (most recent history item)
+                        // JIRA returns histories in chronological order (oldest first), so we need the last one
+                        let lastUpdatedBy = null;
+                        if (ticketData.changelog?.histories?.length > 0) {
+                            const lastHistory = ticketData.changelog.histories[ticketData.changelog.histories.length - 1];
+                            lastUpdatedBy = lastHistory.author?.displayName || null;
+                        }
+                        
                         res.json({
                             success: true,
                             ticket: {
@@ -501,6 +509,7 @@ app.post('/api/jira-ticket', async (req, res) => {
                                 reporter: ticketData.fields.reporter ? ticketData.fields.reporter.displayName : 'Unknown',
                                 created: ticketData.fields.created,
                                 updated: ticketData.fields.updated,
+                                lastUpdatedBy: lastUpdatedBy,
                                 duedate: targetDueDate,
                                 comments: comments,
                                 attachments: attachments, // Include attachment URL mapping
@@ -1092,6 +1101,157 @@ app.get('/api/github/repos/:owner/:repo/pulls/:pull_number/comments', async (req
 });
 
 // ============================================================================
+// REVIEWER WORKLOAD ENDPOINT (for Reviewers tab)
+// ============================================================================
+
+// GET /api/github/reviewer-workload - Get review workload for all team members
+// Returns: { success, members: [{ name, github, pending, changesRequested, commented, approved }] }
+app.get('/api/github/reviewer-workload', async (req, res) => {
+    if (!GITHUB_TOKEN) {
+        return res.status(503).json({ error: 'GitHub token not configured on server' });
+    }
+
+    try {
+        // Get team members with GitHub usernames from the in-memory cache
+        const teamMembers = membersCache.filter(m => m.github);
+        
+        if (teamMembers.length === 0) {
+            return res.json({
+                success: true,
+                members: [],
+                message: 'No team members with GitHub usernames configured'
+            });
+        }
+
+        console.log(`📊 Fetching reviewer workload for ${teamMembers.length} team members...`);
+
+        // For each team member, search for open PRs where they are requested as reviewer or have reviewed
+        const workloadPromises = teamMembers.map(async (member) => {
+            const githubUsername = member.github;
+            
+            try {
+                // Search for PRs where this user is involved (as reviewer, not author)
+                // We'll categorize by their review state
+                const searchQuery = `is:pr is:open review-requested:${githubUsername}`;
+                const pendingResult = await makeGitHubRequest(
+                    `/search/issues?q=${encodeURIComponent(searchQuery)}&per_page=100`
+                );
+                
+                // Search for PRs where user has already reviewed (to get their review states)
+                const reviewedQuery = `is:pr is:open reviewed-by:${githubUsername}`;
+                const reviewedResult = await makeGitHubRequest(
+                    `/search/issues?q=${encodeURIComponent(reviewedQuery)}&per_page=100`
+                );
+                
+                // Count pending (review requested but not yet acted)
+                const pendingCount = pendingResult.statusCode === 200 
+                    ? (pendingResult.data.total_count || 0)
+                    : 0;
+
+                // For reviewed PRs, we need to fetch review details to categorize
+                let approvedCount = 0;
+                let changesRequestedCount = 0;
+                let commentedCount = 0;
+
+                if (reviewedResult.statusCode === 200 && reviewedResult.data.items) {
+                    // Process each reviewed PR to determine the user's review state
+                    // Limit to first 30 PRs for performance
+                    const reviewedPRs = reviewedResult.data.items.slice(0, 30);
+                    
+                    for (const pr of reviewedPRs) {
+                        try {
+                            // Extract owner/repo from PR URL
+                            const repoMatch = pr.repository_url?.match(/repos\/([^/]+)\/([^/]+)$/);
+                            if (!repoMatch) continue;
+                            
+                            const [, owner, repo] = repoMatch;
+                            
+                            // Fetch reviews for this PR
+                            const reviewsResult = await makeGitHubRequest(
+                                `/repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`
+                            );
+                            
+                            if (reviewsResult.statusCode === 200 && Array.isArray(reviewsResult.data)) {
+                                // Find this user's most recent non-pending review
+                                const userReviews = reviewsResult.data
+                                    .filter(r => r.user?.login === githubUsername && r.state !== 'PENDING')
+                                    .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+                                
+                                if (userReviews.length > 0) {
+                                    const latestReview = userReviews[0];
+                                    switch (latestReview.state) {
+                                        case 'APPROVED':
+                                            approvedCount++;
+                                            break;
+                                        case 'CHANGES_REQUESTED':
+                                            changesRequestedCount++;
+                                            break;
+                                        case 'COMMENTED':
+                                        case 'DISMISSED':
+                                            commentedCount++;
+                                            break;
+                                    }
+                                }
+                            }
+                        } catch (prError) {
+                            // Skip this PR on error, continue with others
+                            console.warn(`⚠️ Error fetching reviews for PR #${pr.number}: ${prError.message}`);
+                        }
+                    }
+                }
+
+                return {
+                    name: member.name,
+                    github: githubUsername,
+                    pending: pendingCount,
+                    changesRequested: changesRequestedCount,
+                    commented: commentedCount,
+                    approved: approvedCount,
+                    total: pendingCount + changesRequestedCount + commentedCount + approvedCount
+                };
+                
+            } catch (memberError) {
+                console.error(`❌ Error fetching workload for ${member.name} (@${githubUsername}):`, memberError.message);
+                return {
+                    name: member.name,
+                    github: githubUsername,
+                    pending: 0,
+                    changesRequested: 0,
+                    commented: 0,
+                    approved: 0,
+                    total: 0,
+                    error: memberError.message
+                };
+            }
+        });
+
+        // Execute all queries in parallel (with some rate limiting built into GitHub API)
+        const results = await Promise.all(workloadPromises);
+        
+        // Sort by pending reviews ascending (least pending first = most available for new reviews)
+        // Secondary sort by total ascending for tie-breaking
+        results.sort((a, b) => {
+            if (a.pending !== b.pending) {
+                return a.pending - b.pending; // Least pending first
+            }
+            return a.total - b.total; // Then by least total
+        });
+
+        console.log(`✅ Reviewer workload fetched for ${results.length} members`);
+
+        res.json({
+            success: true,
+            members: results,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('❌ Reviewer workload fetch error:', error);
+        res.status(500).json({ error: 'Failed to fetch reviewer workload', details: error.message });
+    }
+});
+
+// ============================================================================
 // JIRA API ENDPOINTS (continued)
 // ============================================================================
 
@@ -1114,10 +1274,11 @@ app.post('/api/jira-child-issues', async (req, res) => {
 
     try {
         // JQL: find issues where parent = KEY (subtasks), "Epic Link" = KEY (epic children), or "Parent Link" = KEY (feature/initiative)
-        const jql = `parent = ${parentKey} OR "Epic Link" = ${parentKey} OR "Parent Link" = ${parentKey}`;
+        // Sort by most recently updated
+        const jql = `(parent = ${parentKey} OR "Epic Link" = ${parentKey} OR "Parent Link" = ${parentKey}) ORDER BY updated DESC`;
         const encodedJql = encodeURIComponent(jql);
 
-        const apiPath = `/rest/api/2/search?jql=${encodedJql}&maxResults=100&fields=key,summary,assignee,status,issuetype`;
+        const apiPath = `/rest/api/2/search?jql=${encodedJql}&maxResults=100&fields=key,summary,assignee,status,issuetype,updated&expand=changelog`;
 
         const options = {
             hostname: 'issues.redhat.com',
@@ -1138,13 +1299,25 @@ app.post('/api/jira-child-issues', async (req, res) => {
                 if (jiraRes.statusCode === 200) {
                     try {
                         const searchResult = JSON.parse(data);
-                        const issues = (searchResult.issues || []).map((issue) => ({
-                            key: issue.key,
-                            summary: issue.fields?.summary || 'No summary',
-                            assignee: issue.fields?.assignee?.displayName || 'Unassigned',
-                            status: issue.fields?.status?.name || 'Unknown',
-                            type: issue.fields?.issuetype?.name || 'Task'
-                        }));
+                        const issues = (searchResult.issues || []).map((issue) => {
+                            // Get last updater from changelog (most recent history item)
+                            let lastUpdatedBy = null;
+                            const changelog = issue.changelog;
+                            if (changelog?.histories?.length > 0) {
+                                const lastHistory = changelog.histories[changelog.histories.length - 1]; // Most recent (JIRA returns oldest first)
+                                lastUpdatedBy = lastHistory.author?.displayName || null;
+                            }
+                            
+                            return {
+                                key: issue.key,
+                                summary: issue.fields?.summary || 'No summary',
+                                assignee: issue.fields?.assignee?.displayName || 'Unassigned',
+                                status: issue.fields?.status?.name || 'Unknown',
+                                type: issue.fields?.issuetype?.name || 'Task',
+                                updated: issue.fields?.updated || null,
+                                lastUpdatedBy: lastUpdatedBy
+                            };
+                        });
                         res.json({ success: true, total: searchResult.total || issues.length, issues });
                     } catch (e) {
                         res.status(500).json({ error: 'Failed to parse JIRA response', details: e.message });
@@ -1163,6 +1336,275 @@ app.post('/api/jira-child-issues', async (req, res) => {
         jiraRequest.end();
     } catch (error) {
         console.error('JIRA child issues fetch error:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+});
+
+// Update JIRA issue field endpoint
+// Request body: { issueKey: string, fieldId: string, value: string }
+app.post('/api/jira-update-field', async (req, res) => {
+    const { issueKey, fieldId, value } = req.body;
+    const token = JIRA_TOKEN;
+    
+    if (!issueKey || !fieldId) {
+        return res.status(400).json({ error: 'issueKey and fieldId are required' });
+    }
+    
+    if (!token) {
+        return res.status(503).json({ error: 'JIRA token not configured on server' });
+    }
+
+    try {
+        const updateData = JSON.stringify({
+            fields: {
+                [fieldId]: value || null
+            }
+        });
+
+        const options = {
+            hostname: 'issues.redhat.com',
+            path: `/rest/api/2/issue/${issueKey}`,
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'OCMUI-Team-Dashboard'
+            }
+        };
+
+        console.log(`📝 Updating ${issueKey} field ${fieldId}`);
+
+        const jiraRequest = https.request(options, (jiraRes) => {
+            let data = '';
+            jiraRes.on('data', (chunk) => { data += chunk; });
+            jiraRes.on('end', () => {
+                if (jiraRes.statusCode === 204 || jiraRes.statusCode === 200) {
+                    console.log(`✅ Successfully updated ${issueKey}`);
+                    res.json({ success: true, issueKey, fieldId });
+                } else {
+                    console.error(`❌ Failed to update ${issueKey}: ${jiraRes.statusCode}`, data);
+                    res.status(jiraRes.statusCode).json({ 
+                        error: `JIRA API error: ${jiraRes.statusCode}`, 
+                        details: data 
+                    });
+                }
+            });
+        });
+
+        jiraRequest.on('error', (error) => {
+            console.error('JIRA update request error:', error);
+            res.status(500).json({ error: 'Network error connecting to JIRA', details: error.message });
+        });
+
+        jiraRequest.write(updateData);
+        jiraRequest.end();
+    } catch (error) {
+        console.error('JIRA update error:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+});
+
+// JIRA Epics endpoint
+// Fetches Epics with different filters: active (ui-active-item label), all, blocked
+// Request body: { filter: 'active' | 'all' | 'blocked' }
+// Returns: { success, epics: [...], total, filter, jqlQuery }
+app.post('/api/jira-epics', async (req, res) => {
+    const { filter = 'active' } = req.body;
+    const token = JIRA_TOKEN;
+    
+    if (!token) {
+        return res.status(503).json({ error: 'JIRA token not configured on server' });
+    }
+
+    try {
+        // Build JQL based on filter
+        // All queries scoped to OCMUI project
+        let jql;
+        switch (filter) {
+            case 'all':
+                // All OCMUI unblocked epics (without ui-active-item label requirement)
+                // Exclude closed epics older than 3 months
+                jql = `project = OCMUI AND issuetype = Epic AND Blocked = "False" AND (status != Closed OR resolved >= -90d) ORDER BY "Target end" ASC`;
+                break;
+            case 'blocked':
+                // Blocked OCMUI epics with ui-active-item label
+                jql = `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "True" ORDER BY "Target end" ASC`;
+                break;
+            case 'planning':
+                // Planning OCMUI epics (ui-active-item label, unblocked, status = New/Refinement/Backlog/To Do)
+                jql = `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "False" AND status in (New, Refinement, Backlog, "To Do") ORDER BY "Target end" ASC`;
+                break;
+            case 'in-progress':
+            default:
+                // In-Progress OCMUI epics (ui-active-item label, unblocked, status = In Progress/Code Review)
+                jql = `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "False" AND status in ("In Progress", "Code Review", Review) ORDER BY "Target end" ASC`;
+                break;
+        }
+
+        const encodedJql = encodeURIComponent(jql);
+        
+        // Request fields including custom fields:
+        // - customfield_12319289: Marketing Impact Notes
+        // - customfield_12316544: Blocked Reason
+        // - customfield_12313942: Target end
+        // - customfield_12313140: Parent Link
+        // - customfield_12318341: Feature Link
+        const fields = [
+            'key', 'summary', 'status', 'priority', 'assignee',
+            'updated',              // Last updated timestamp
+            'customfield_12313942', // Target end
+            'customfield_12319289', // Marketing Impact Notes
+            'customfield_12316544', // Blocked Reason
+            'customfield_12313140', // Parent Link
+            'customfield_12318341', // Feature Link
+            'parent',               // Standard parent (subtasks)
+            'issuelinks'            // Issue links
+        ].join(',');
+
+        const apiPath = `/rest/api/2/search?jql=${encodedJql}&maxResults=200&fields=${fields}&expand=names,changelog`;
+
+        const options = {
+            hostname: 'issues.redhat.com',
+            path: apiPath,
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'OCMUI-Team-Dashboard'
+            }
+        };
+
+        console.log(`🟪 Fetching epics with filter: ${filter}, JQL: ${jql}`);
+
+        const jiraRequest = https.request(options, (jiraRes) => {
+            let data = '';
+            jiraRes.on('data', (chunk) => { data += chunk; });
+            jiraRes.on('end', () => {
+                if (jiraRes.statusCode === 200) {
+                    try {
+                        const searchResult = JSON.parse(data);
+                        const names = searchResult.names || {};
+                        
+                        // Log field names for debugging
+                        const targetEndFields = Object.keys(names).filter(k => 
+                            String(names[k] || '').toLowerCase().includes('target')
+                        );
+                        const parentLinkFields = Object.keys(names).filter(k => 
+                            String(names[k] || '').toLowerCase().includes('parent link')
+                        );
+                        console.log(`🟪 Found ${searchResult.issues?.length || 0} epics`);
+                        console.log(`   Target-related fields: ${JSON.stringify(targetEndFields.map(k => `${k}=${names[k]}`))}`);
+                        console.log(`   Parent link fields: ${JSON.stringify(parentLinkFields.map(k => `${k}=${names[k]}`))}`);
+                        
+                        
+                        const epics = (searchResult.issues || []).map((issue) => {
+                            const fields = issue.fields || {};
+                            
+                            // Extract target end - try multiple field candidates
+                            let targetEnd = null;
+                            const targetEndCandidates = ['customfield_12313942', ...targetEndFields];
+                            for (const fieldId of targetEndCandidates) {
+                                if (fields[fieldId] && typeof fields[fieldId] === 'string' && fields[fieldId].match(/^\d{4}-\d{2}-\d{2}/)) {
+                                    targetEnd = fields[fieldId];
+                                    break;
+                                }
+                            }
+                            
+                            // Extract parent key and feature key from custom fields
+                            let parentKey = null;
+                            let featureKey = null;
+                            
+                            // 1. Parent Link field (customfield_12313140) - can be string or object
+                            const parentLinkVal = fields.customfield_12313140;
+                            if (parentLinkVal) {
+                                if (typeof parentLinkVal === 'string' && /[A-Z]+-\d+/.test(parentLinkVal)) {
+                                    parentKey = parentLinkVal;
+                                } else if (parentLinkVal.key) {
+                                    parentKey = parentLinkVal.key;
+                                }
+                            }
+                            
+                            // 2. Feature Link field (customfield_12318341) - can be string or object
+                            const featureLinkVal = fields.customfield_12318341;
+                            if (featureLinkVal) {
+                                if (typeof featureLinkVal === 'string' && /[A-Z]+-\d+/.test(featureLinkVal)) {
+                                    featureKey = featureLinkVal;
+                                } else if (featureLinkVal.key) {
+                                    featureKey = featureLinkVal.key;
+                                }
+                            }
+                            
+                            // 3. Standard parent field (for subtasks)
+                            if (!parentKey && fields.parent?.key) {
+                                parentKey = fields.parent.key;
+                            }
+                            
+                            // 4. Dynamic parent link fields (discovered via names)
+                            if (!parentKey) {
+                                for (const fieldId of parentLinkFields) {
+                                    const val = fields[fieldId];
+                                    if (typeof val === 'string' && /[A-Z]+-\d+/.test(val)) {
+                                        parentKey = val;
+                                        break;
+                                    } else if (val && typeof val === 'object' && val.key) {
+                                        parentKey = val.key;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Get last updater from changelog (most recent history item)
+                            let lastUpdatedBy = null;
+                            const changelog = issue.changelog;
+                            if (changelog?.histories?.length > 0) {
+                                const lastHistory = changelog.histories[changelog.histories.length - 1]; // Most recent (JIRA returns oldest first)
+                                lastUpdatedBy = lastHistory.author?.displayName || null;
+                            }
+                            
+                            return {
+                                key: issue.key,
+                                summary: fields.summary || 'No summary',
+                                status: fields.status?.name || 'Unknown',
+                                priority: fields.priority?.name || 'Normal',
+                                assignee: fields.assignee?.displayName || 'Unassigned',
+                                targetEnd: targetEnd,
+                                updated: fields.updated || null,
+                                lastUpdatedBy: lastUpdatedBy,
+                                marketingImpactNotes: fields.customfield_12319289 || null,
+                                blockedReason: fields.customfield_12316544 || null,
+                                parentKey: parentKey,
+                                featureKey: featureKey
+                            };
+                        });
+                        
+                        res.json({
+                            success: true,
+                            epics,
+                            total: searchResult.total || epics.length,
+                            filter,
+                            jqlQuery: jql
+                        });
+                    } catch (e) {
+                        console.error('Failed to parse JIRA epics response:', e);
+                        res.status(500).json({ error: 'Failed to parse JIRA response', details: e.message });
+                    }
+                } else {
+                    console.error(`JIRA epics API error ${jiraRes.statusCode}:`, data);
+                    res.status(jiraRes.statusCode).json({ error: `JIRA API error: ${jiraRes.statusCode}`, details: data });
+                }
+            });
+        });
+
+        jiraRequest.on('error', (error) => {
+            console.error('JIRA epics request error:', error);
+            res.status(500).json({ error: 'Network error connecting to JIRA', details: error.message });
+        });
+
+        jiraRequest.end();
+    } catch (error) {
+        console.error('JIRA epics fetch error:', error);
         res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 });

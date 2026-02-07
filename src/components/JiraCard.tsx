@@ -11,6 +11,7 @@ import {
   countNewJiraCommentsSinceLastViewed, 
   updateJiraCommentsLastViewed 
 } from '../utils/jiraCommentNotifications';
+import { PriorityIcon, getPriorityColor } from '../utils/priorityIcons';
 
 interface JiraTicket {
   key: string;
@@ -98,42 +99,6 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
       case 'EPIC': return '🟪';
       default: return '⬡';
     }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toUpperCase()) {
-      case 'BLOCKER':
-        return '#ef4444'; // Bright red
-      case 'CRITICAL':
-        return '#dc2626'; // Red
-      case 'MAJOR':
-        return '#ea580c'; // Orange
-      case 'NORMAL':
-        return '#d6a94f'; // Tan-like
-      case 'MINOR':
-        return '#3b82f6'; // Blue
-      case 'UNDEFINED':
-      case 'NONE':
-        return '#9ca3af'; // Gray
-      default:
-        return '#6b7280'; // Gray fallback
-    }
-  };
-
-  const renderPriorityIcon = (priority: string) => {
-    const p = priority.toUpperCase();
-    const color = getPriorityColor(priority);
-    if (p === 'UNDEFINED' || p === 'NONE') {
-      return <span className="jira-badge-circle" aria-hidden="true" style={{ borderColor: color }}></span>;
-    }
-    if (p === 'MINOR') {
-      return <span className="jira-badge-triangle-down" aria-hidden="true" style={{ borderTopColor: color }}></span>;
-    }
-    if (p === 'NORMAL') {
-      return <span className="jira-badge-equals" aria-hidden="true" style={{ color }}>≡</span>;
-    }
-    // Upward triangles for Major, Critical, Blocker
-    return <span className="jira-badge-triangle" aria-hidden="true" style={{ borderBottomColor: color }}></span>;
   };
 
   const getStatusColor = (status: string) => {
@@ -270,7 +235,7 @@ const JiraCard: React.FC<JiraCardProps> = ({ ticket, onClick, expandMoreInfoByDe
           className="jira-badge jira-priority" 
           style={{ borderColor: getPriorityColor(ticket.priority) }}
         >
-          {renderPriorityIcon(ticket.priority)}
+          <PriorityIcon priority={ticket.priority} />
           {toTitleCase(ticket.priority)}
         </span>
         <span 

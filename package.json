@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "start:api": "node server/index.js",
     "start": "yarn build && lsof -ti:3017 | xargs kill -9 2>/dev/null || true; node server/index.js & sleep 2 && open http://localhost:3017 && wait",
-    "start:dev": "lsof -ti:3017 | xargs kill -9 2>/dev/null || true; concurrently --names \"API,React\" --prefix-colors \"blue,green\" \"node server/index.js\" \"yarn dev\""
+    "start:dev": "lsof -ti:3017 | xargs kill -9 2>/dev/null || true; concurrently --names \"API,React\" --prefix-colors \"blue,green\" \"nodemon --watch server server/index.js\" \"yarn dev\""
   },
   "dependencies": {
     "@atlaskit/adf-utils": "^19.23.1",
@@ -24,6 +24,8 @@
     "marked": "^4.3.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-is": "^19.2.4",
+    "recharts": "^3.7.0",
     "vite": "^5.4.20"
   },
   "devDependencies": {
@@ -34,6 +36,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.4.0",
+    "nodemon": "^3.1.11",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.43.0"
   },

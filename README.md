@@ -7,6 +7,8 @@
 
 - **🔗 GitHub Integration**: Track PRs, code reviews, and repository activity
 - **📋 JIRA Integration**: Manage sprint tickets, view descriptions, comments with advanced markdown rendering
+- **🟪 Epics Dashboard**: Team-wide view of active epics with filters, sortable columns, editable Marketing Impact Notes, "Last updated by" info
+- **👥 Reviewer Workload**: See team's code review distribution to balance workload (top 2 available highlighted)
 - **🩺 Doc Links Health Checker**: Real-time validation of uhc-portal documentation URLs
 - **Jira Hierarchy View**: Click any JIRA card to see a popup containing a hierarchy tree of all of it's parents.
 <img src="src/assets/JiraHierarchyPopup.png" alt="JIRA Hierarchy Popup" width="600">
@@ -31,8 +33,8 @@ The header uses an **inline grouped navigation** with primary categories and the
 
 | Primary Tab | Secondary Tabs | Description |
 |-------------|----------------|-------------|
-| **🎫 JIRA** | My Sprint JIRAs, JIRA Lookup | JIRA ticket management |
-| **🐙 GitHub** | My Code Reviews, My PRs | GitHub PR tracking |
+| **🎫 JIRA** | My Sprint JIRAs, JIRA Lookup, Epics | JIRA ticket management, team epics view |
+| **🐙 GitHub** | My Code Reviews, My PRs, Reviewers | GitHub PR tracking, team workload |
 | **••• Other** | 🚩 Feature Flags, 🔗 Doc Links | Unleash feature flags, URL health checker |
 
 - Click a **primary tab** to switch categories and reveal its subtabs

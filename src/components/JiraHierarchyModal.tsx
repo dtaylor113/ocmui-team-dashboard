@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useJiraTicket } from '../hooks/useApiQueries';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatJiraTimestamp } from '../utils/formatting';
+import { PriorityIcon, getPriorityColor } from '../utils/priorityIcons';
 
 interface JiraTicket {
   key: string;
@@ -141,41 +142,6 @@ const JiraHierarchyModal: React.FC<JiraHierarchyModalProps> = ({ jiraKey, isOpen
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toUpperCase()) {
-      case 'BLOCKER':
-        return '#ef4444';
-      case 'CRITICAL':
-        return '#dc2626';
-      case 'MAJOR':
-        return '#ea580c';
-      case 'NORMAL':
-        return '#d6a94f';
-      case 'MINOR':
-        return '#3b82f6';
-      case 'UNDEFINED':
-      case 'NONE':
-        return '#9ca3af';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  const renderPriorityIcon = (priority: string) => {
-    const p = priority.toUpperCase();
-    const color = getPriorityColor(priority);
-    if (p === 'UNDEFINED' || p === 'NONE') {
-      return <span className="jira-badge-circle" aria-hidden="true" style={{ borderColor: color }}></span>;
-    }
-    if (p === 'MINOR') {
-      return <span className="jira-badge-triangle-down" aria-hidden="true" style={{ borderTopColor: color }}></span>;
-    }
-    if (p === 'NORMAL') {
-      return <span className="jira-badge-equals" aria-hidden="true" style={{ color }}>≡</span>;
-    }
-    return <span className="jira-badge-triangle" aria-hidden="true" style={{ borderBottomColor: color }}></span>;
-  };
-
   const getStatusColor = (status: string) => {
     const normalizedStatus = status.toUpperCase().replace(/\s+/g, '_');
     switch (normalizedStatus) {
@@ -309,7 +275,7 @@ const JiraHierarchyModal: React.FC<JiraHierarchyModalProps> = ({ jiraKey, isOpen
                         className="jira-badge jira-priority" 
                         style={{ borderColor: getPriorityColor(node.ticket.priority) }}
                       >
-                        {renderPriorityIcon(node.ticket.priority)}
+                        <PriorityIcon priority={node.ticket.priority} />
                         {toTitleCase(node.ticket.priority)}
                       </span>
                       
