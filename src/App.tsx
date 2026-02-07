@@ -11,7 +11,7 @@ import unleashIcon from './assets/unleash.png';
 import './styles/App.css';
 
 // Tab types for the application
-export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'reviewers' | 'jira-lookup' | 'feature-flags' | 'doc-links' | 'epics';
+export type TabType = 'my-sprint-jiras' | 'my-code-reviews' | 'my-prs' | 'reviewers' | 'feature-flags' | 'doc-links' | 'epics';
 export type PrimaryTabType = 'jira' | 'github' | 'other';
 
 interface AppState {
@@ -38,7 +38,6 @@ const primaryTabConfig = [
 const secondaryTabConfig: Record<PrimaryTabType, Array<{ id: TabType; label: string; icon?: string }>> = {
   jira: [
     { id: 'my-sprint-jiras', label: 'My Sprint JIRAs' },
-    { id: 'jira-lookup', label: 'JIRA Lookup' },
     { id: 'epics', label: 'Epics' }
   ],
   github: [

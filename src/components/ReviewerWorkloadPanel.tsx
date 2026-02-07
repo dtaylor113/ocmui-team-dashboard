@@ -144,7 +144,18 @@ const ReviewerWorkloadPanel: React.FC = () => {
                     @{member.github}
                   </a>
                 </td>
-                <td className="num-col pending-col">{member.pending > 0 ? member.pending : ''}</td>
+                <td className="num-col pending-col">
+                  {member.pending > 0 ? (
+                    <a
+                      href={`https://github.com/RedHatInsights/uhc-portal/pulls?q=is:pr+is:open+review-requested:${member.github}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="pending-link"
+                    >
+                      {member.pending}
+                    </a>
+                  ) : ''}
+                </td>
                 <td className="num-col changes-col">{member.changesRequested > 0 ? member.changesRequested : ''}</td>
                 <td className="num-col commented-col">{member.commented > 0 ? member.commented : ''}</td>
                 <td className="num-col approved-col">{member.approved > 0 ? member.approved : ''}</td>

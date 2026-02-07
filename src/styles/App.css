@@ -908,21 +908,31 @@ html, body {
   padding: 6px 12px;
   background: none;
   border: none;
-  border-radius: 4px;
+  border-bottom: 1px solid transparent;
+  border-left: 2px solid transparent;
+  border-radius: 0;
   color: #6b7280;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  outline: none;
 }
 
 .nav-primary-tab:hover {
   color: #9ca3af;
-  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 2px solid #6b7280;
+}
+
+.nav-primary-tab:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .nav-primary-tab.active {
   color: #e5e7eb;
+  border-bottom: 3px solid #60a5fa;
+  border-left: 2px solid #60a5fa;
 }
 
 .nav-group-icon {
@@ -943,26 +953,31 @@ html, body {
   gap: 6px;
   padding: 6px 14px;
   background: none;
-  border: 1px solid transparent;
-  border-radius: 4px;
+  border: none;
+  border-bottom: 1px solid #444;
+  border-radius: 0;
   color: #9ca3af;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  outline: none;
 }
 
 .nav-tab:hover {
   color: #e5e7eb;
-  background: rgba(255, 255, 255, 0.05);
-  border-color: #374151;
+  border-bottom: 2px solid #6b7280;
+}
+
+.nav-tab:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .nav-tab.active {
   color: #60a5fa;
-  background: rgba(96, 165, 250, 0.12);
-  border-color: #60a5fa;
+  border-bottom: 2px solid #60a5fa;
 }
 
 .nav-tab-icon {
@@ -3622,305 +3637,6 @@ html, body {
     align-items: stretch;
     gap: 8px;
   }
-}
-
-/* ===== JIRA LOOKUP STYLES ===== */
-
-/* JIRA Input Line - Wrapper for first line */
-.jira-input-line {
-  display: block;
-  width: 100%;
-  margin-bottom: 12px;
-  clear: both;
-}
-
-/* JIRA History Line - Wrapper for second line */
-.jira-history-line {
-  display: block;
-  width: 100%;
-  margin-top: 12px;
-  clear: both;
-  float: none;
-}
-
-/* JIRA Title Row - First line with title and search controls */
-.jira-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 0;
-  width: 100%;
-}
-
-.title-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.title-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.column-icon {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-}
-
-/* JIRA Prefix Section */
-.jira-prefix-section {
-  position: relative;
-  width: 95px;
-}
-
-.jira-prefix-input {
-  width: 100%;
-  background: #222;
-  border: 1px solid #444;
-  color: #f59e0b;
-  padding: 6px 8px;
-  font-size: 12px;
-  border-radius: 4px;
-  font-family: monospace;
-}
-
-.jira-prefix-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
-
-.jira-prefix-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: #222;
-  border: 1px solid #444;
-  border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.prefix-item {
-  padding: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-family: monospace;
-  color: #f59e0b;
-  border-bottom: 1px solid #333;
-}
-
-.prefix-item:hover {
-  background: #333;
-  color: #fbbf24;
-}
-
-.prefix-item:last-child {
-  border-bottom: none;
-}
-
-.prefix-placeholder {
-  padding: 8px;
-  color: #666;
-  font-size: 12px;
-  font-style: italic;
-}
-
-/* JIRA Number Section */
-.jira-number-section {
-  width: 80px;
-}
-
-.jira-number-input {
-  width: 100%;
-  background: #222;
-  border: 1px solid #444;
-  color: white;
-  padding: 6px 8px;
-  font-size: 12px;
-  border-radius: 4px;
-  font-family: monospace;
-}
-
-.jira-number-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-}
-
-/* JIRA History Section - Second line with recent JIRAs dropdown */
-.jira-history-section {
-  margin-top: 0;
-  margin-bottom: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  clear: both; /* Force new line */
-  flex-wrap: nowrap;
-}
-
-.jira-history-section label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #fff;
-  margin-bottom: 0;
-  margin-left: 0;
-  white-space: nowrap;
-}
-
-.jira-dropdown-wrapper {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-
-.jira-history-button {
-  background: #1a1a1a;
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 32px;
-  width: 100%;
-}
-
-.jira-history-button:hover {
-  border-color: #555;
-  background: #222;
-}
-
-.selected-jira {
-  color: #ccc;
-  font-size: 12px;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-
-.dropdown-arrow {
-  color: #888;
-  font-size: 12px;
-  margin-left: 8px;
-  flex-shrink: 0;
-}
-
-.jira-history-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: #1a1a1a;
-  border: 1px solid #444;
-  border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.history-item {
-  padding: 8px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #333;
-  font-size: 12px;
-  color: #ccc;
-  display: block;
-  text-align: left;
-}
-
-.history-item:hover {
-  background-color: #333;
-  color: white;
-}
-
-.history-item.selected {
-  background-color: #2563eb;
-  color: white;
-}
-
-.history-item.selected .history-jira-id {
-  color: #fbbf24;
-}
-
-.history-item.selected .history-summary {
-  color: #e5e7eb;
-}
-
-.history-item.selected:hover {
-  background-color: #1d4ed8;
-}
-
-.history-item:last-child {
-  border-bottom: none;
-}
-
-.history-jira-id {
-  color: #f59e0b;
-  font-weight: 600;
-}
-
-.history-summary {
-  color: #888;
-  font-size: 11px;
-  display: block;
-  margin-top: 2px;
-}
-
-.history-placeholder {
-  color: #666 !important;
-  cursor: default !important;
-  font-style: italic;
-  text-align: center;
-  padding: 20px 12px;
-  font-size: 12px;
-}
-
-.history-placeholder:hover {
-  background-color: transparent !important;
-}
-
-/* JIRA Content Spacer - Creates visual gap between controls and JIRA card */
-.jira-content-spacer {
-  height: 12px;
-}
-
-/* JIRA Ticket Display */
-.jira-ticket-display {
-  flex: 1;
-  min-height: 200px;
-  padding: 16px;
-}
-
-.jira-ticket-display .placeholder {
-  color: #666;
-  text-align: center;
-  padding: 24px;
-  font-style: italic;
-  font-size: 16px;
-}
-
-.jira-ticket-display .error {
-  color: #ef4444;
-  text-align: center;
-  padding: 16px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px;
-  font-size: 14px;
 }
 
 /* GitHub Image Fallback Links */
@@ -6703,6 +6419,16 @@ body.dark-theme .github-image-fallback:hover {
 .workload-table .github-link:hover {
   color: #93c5fd;
   text-decoration: underline;
+}
+
+.workload-table .pending-link {
+  color: #f59e0b;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.workload-table .pending-link:hover {
+  color: #fbbf24;
 }
 
 .workload-table .num-col {
