@@ -1131,14 +1131,15 @@ app.get('/api/github/reviewer-workload', async (req, res) => {
             
             try {
                 // Search for PRs where this user is involved (as reviewer, not author)
-                // We'll categorize by their review state
-                const searchQuery = `is:pr is:open review-requested:${githubUsername}`;
+                // Scoped to uhc-portal repo only
+                const searchQuery = `is:pr is:open repo:RedHatInsights/uhc-portal review-requested:${githubUsername}`;
                 const pendingResult = await makeGitHubRequest(
                     `/search/issues?q=${encodeURIComponent(searchQuery)}&per_page=100`
                 );
                 
                 // Search for PRs where user has already reviewed (to get their review states)
-                const reviewedQuery = `is:pr is:open reviewed-by:${githubUsername}`;
+                // Scoped to uhc-portal repo only
+                const reviewedQuery = `is:pr is:open repo:RedHatInsights/uhc-portal reviewed-by:${githubUsername}`;
                 const reviewedResult = await makeGitHubRequest(
                     `/search/issues?q=${encodeURIComponent(reviewedQuery)}&per_page=100`
                 );
