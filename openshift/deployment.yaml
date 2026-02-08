@@ -8,6 +8,10 @@ metadata:
     app.kubernetes.io/component: web
 spec:
   replicas: 1
+  # Use Recreate strategy to avoid PVC Multi-Attach deadlock
+  # (RWO volumes can only be mounted by one pod at a time)
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: ocmui-team-dashboard
