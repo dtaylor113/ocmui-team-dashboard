@@ -71,6 +71,9 @@ interface GitHubPR {
   checksSummary?: string;
   checksTotal?: number;
   checksSucceeded?: number;
+  // Pre-fetched data for notification badges (avoids duplicate API calls)
+  description?: string;
+  comments?: PRCommentForNotification[];
 }
 
 interface SprintJirasResponse {
@@ -293,8 +296,19 @@ const fetchMyPRs = async (githubUsername: string, status: 'open' | 'closed', pag
   };
 };
 
+// Comment structure for notification badges (lightweight version)
+export interface PRCommentForNotification {
+  id: string | number;
+  user: { login: string };
+  created_at?: string;
+  submitted_at?: string;
+  updated_at?: string;
+  body?: string;
+}
+
 // Function to fetch detailed PR information including reviewers and comments
 // Returns reviewers plus mergeability and checks info to support UI badges
+// Also returns comments array for notification badges (eliminates need for separate usePRConversation call)
 // Uses server-side GitHub proxy (no token needed - server provides it)
 const fetchPRDetails = async (
   repoUrl: string,
@@ -308,6 +322,9 @@ const fetchPRDetails = async (
   checksSummary?: string;
   checksTotal?: number;
   checksSucceeded?: number;
+  // New fields for eliminating duplicate API calls
+  description?: string;
+  comments: PRCommentForNotification[];
 }> => {
   // Extract owner/repo from GitHub API URL
   // URLs are in format: https://api.github.com/repos/owner/repo/issues/123
@@ -602,6 +619,37 @@ const fetchPRDetails = async (
       // ignore checks failures
     }
 
+    // Build unified comments array for notification badges
+    // This includes review comments (with body) and general issue comments
+    const unifiedComments: PRCommentForNotification[] = [];
+    
+    // Add reviews that have comment bodies
+    reviews.forEach((review: any) => {
+      if (review.body && review.body.trim() && review.user?.login) {
+        unifiedComments.push({
+          id: `review-${review.id}`,
+          user: { login: review.user.login },
+          created_at: review.submitted_at,
+          submitted_at: review.submitted_at,
+          updated_at: review.submitted_at, // Reviews don't have separate updated_at
+          body: review.body
+        });
+      }
+    });
+    
+    // Add general issue comments
+    generalComments.forEach((comment: any) => {
+      if (comment.user?.login) {
+        unifiedComments.push({
+          id: comment.id,
+          user: { login: comment.user.login },
+          created_at: comment.created_at,
+          updated_at: comment.updated_at,
+          body: comment.body
+        });
+      }
+    });
+
     return {
       reviewers: sortedReviewers,
       mergeable_state: mergeableState,
@@ -609,7 +657,10 @@ const fetchPRDetails = async (
       checksState,
       checksSummary,
       checksTotal,
-      checksSucceeded
+      checksSucceeded,
+      // New fields for eliminating duplicate API calls
+      description: prDetails?.body || '',
+      comments: unifiedComments
     };
     
   } catch (error) {
@@ -625,7 +676,7 @@ const fetchPRDetails = async (
   }
 };
 
-// Function to enhance PRs with reviewer data
+// Function to enhance PRs with reviewer data and pre-fetch comments for notification badges
 // Uses server-side GitHub proxy (no token needed - server provides it)
 export const enhancePRsWithReviewers = async (prs: GitHubPR[], currentUser: string): Promise<GitHubPR[]> => {
   console.log(`🚀 enhancePRsWithReviewers starting with ${prs.length} PRs for user: ${currentUser}`);
@@ -641,7 +692,7 @@ export const enhancePRsWithReviewers = async (prs: GitHubPR[], currentUser: stri
         const url = pr.repository_url || pr.url;
         console.log(`🔄 Processing PR ${index + 1}/${prs.length}: #${pr.number} (${pr.title?.substring(0, 50)}...)`);
         const details = await fetchPRDetails(url, pr.number, currentUser);
-        console.log(`✅ Enhanced PR #${pr.number} with ${details.reviewers.length} reviewers (mergeable_state=${details.mergeable_state || 'unknown'}, checks=${details.checksState || 'n/a'})`);
+        console.log(`✅ Enhanced PR #${pr.number} with ${details.reviewers.length} reviewers, ${details.comments.length} comments (mergeable_state=${details.mergeable_state || 'unknown'}, checks=${details.checksState || 'n/a'})`);
         return {
           ...pr,
           reviewers: details.reviewers,
@@ -650,7 +701,10 @@ export const enhancePRsWithReviewers = async (prs: GitHubPR[], currentUser: stri
           checksState: details.checksState,
           checksSummary: details.checksSummary,
           checksTotal: details.checksTotal,
-          checksSucceeded: details.checksSucceeded
+          checksSucceeded: details.checksSucceeded,
+          // Pre-fetched data for notification badges (eliminates duplicate API calls)
+          description: details.description,
+          comments: details.comments
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -659,7 +713,7 @@ export const enhancePRsWithReviewers = async (prs: GitHubPR[], currentUser: stri
           pr: { number: pr.number, title: pr.title?.substring(0, 50), url: pr.repository_url || pr.url }
         });
         // Return PR with empty reviewers but log the issue for debugging
-        return { ...pr, reviewers: [], _reviewerFetchError: errorMessage } as unknown as GitHubPR;
+        return { ...pr, reviewers: [], comments: [], _reviewerFetchError: errorMessage } as unknown as GitHubPR;
       }
     })
   );
@@ -914,19 +968,23 @@ export const useMyPRs = (status: 'open' | 'closed' = 'open') => {
   });
 };
 
-export const usePRConversation = (repoName: string, prNumber: number) => {
+export const usePRConversation = (repoName: string, prNumber: number, options?: { enabled?: boolean }) => {
+  // Default enabled to true for backward compatibility, but allow explicit disable for lazy loading
+  const isEnabled = options?.enabled !== false && !!repoName && !!prNumber;
+  
   console.log(`🔍 usePRConversation hook called:`, {
     repoName,
     prNumber,
-    enabled: !!repoName && !!prNumber
+    enabled: isEnabled,
+    lazyLoading: options?.enabled === false ? 'waiting for expansion' : 'immediate'
   });
 
   return useQuery<EnhancedPRConversationResponse>({
     queryKey: queryKeys.prConversation(repoName, prNumber),
     queryFn: () => fetchPRConversation(repoName, prNumber),
-    enabled: !!repoName && !!prNumber, // No token needed - server provides it
+    enabled: isEnabled,
     staleTime: 2 * 60 * 1000, // 2 minutes for PR conversation data
-    refetchInterval: 3 * 60 * 1000, // Auto-refresh every 3 minutes to pick up new comments
+    refetchInterval: isEnabled ? 3 * 60 * 1000 : false, // Only auto-refresh when enabled
     refetchIntervalInBackground: true, // Continue refreshing when window not focused
   });
 };

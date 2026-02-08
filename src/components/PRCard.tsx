@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { GitHubReviewer } from '../hooks/useApiQueries';
-import { usePRConversation } from '../hooks/useApiQueries';
+import type { GitHubReviewer, PRCommentForNotification } from '../hooks/useApiQueries';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatRelativeDateInTimezone } from '../utils/formatting';
 import { 
@@ -47,6 +46,9 @@ interface GitHubPR {
   checksSummary?: string;
   checksTotal?: number;
   checksSucceeded?: number;
+  // Pre-fetched data for notification badges (avoids duplicate API calls)
+  description?: string;
+  comments?: PRCommentForNotification[];
 }
 
 // Helper function to extract repository name from PR object
@@ -73,6 +75,10 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
   const [showJiraWarning, setShowJiraWarning] = useState(false);
   const [copied, setCopied] = useState<boolean>(false);
   
+  // Track if sections have been expanded (for lazy loading)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [conversationExpanded, setConversationExpanded] = useState(false);
+  
   // Initialize notification system and cleanup old data
   useEffect(() => {
     if (pr.reviewers && pr.reviewers.length > 0) {
@@ -97,10 +103,9 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
     }
   }, [pr.number, pr.reviewers]);
   
-  // Get PR conversation data to access comments count
+  // Use pre-fetched comments from PR data for notification badges (no additional API call!)
   const repoName = getRepoName(pr);
-  const { data: conversationData } = usePRConversation(repoName, pr.number);
-  const conversationCount = conversationData?.comments ? conversationData.comments.length : 0;
+  const prComments = pr.comments || [];
 
   const checkoutCmd = `gh pr checkout ${pr.number}`;
 
@@ -270,17 +275,17 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
         <span className="pr-reviewers-label">Reviewers:</span>
         {pr.reviewers && pr.reviewers.filter(r => !r.username.endsWith('[bot]')).length > 0 ? (
           pr.reviewers.filter(r => !r.username.endsWith('[bot]')).map((reviewer) => {
-            // Compute notification info based on live conversation data without gating on hasComments
-            const notificationInfo = conversationData?.comments ?
-              getNotificationInfo(getRepoName(pr), pr.number, reviewer.username, conversationData.comments) :
+            // Compute notification info using pre-fetched comments (no additional API call!)
+            const notificationInfo = prComments.length > 0 ?
+              getNotificationInfo(getRepoName(pr), pr.number, reviewer.username, prComments) :
               { count: 0, urgency: 'none' as const, newestCommentAge: 0 };
             
             const { count: newCommentsCount, urgency } = notificationInfo;
             
-            // Debug: Log notification badge rendering for this reviewer
-            if (conversationData?.comments) {
+            // Debug: Log notification badge rendering for this reviewer (only when there are comments)
+            if (prComments.length > 0 && newCommentsCount > 0) {
               console.log(`🎯 PRCard rendering reviewer ${reviewer.username} for PR #${pr.number}:`, {
-                commentsAvailable: conversationData.comments.length,
+                commentsAvailable: prComments.length,
                 notificationInfo,
                 willShowBadge: newCommentsCount > 0
               });
@@ -289,7 +294,7 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
             // Show comment bubble next to '?' when reviewer is still review_requested but has left comments
             const hasAnyComments = !!(
               reviewer.hasComments ||
-              (conversationData?.comments?.some((c: any) => c?.user?.login === reviewer.username && (c?.body?.trim?.() || c?.has_body)) ?? false)
+              prComments.some((c) => c?.user?.login === reviewer.username && c?.body?.trim?.())
             );
             const stateIcon = reviewer.state === 'review_requested' && hasAnyComments
               ? '? 💬'
@@ -316,22 +321,24 @@ const PRCard: React.FC<PRCardProps> = ({ pr, onClick, isSelected = false, hasInv
         )}
       </div>
       
-      {/* Description Section */}
+      {/* Description Section - lazy loaded on first expand */}
       <CollapsibleSection 
         title="Description"
         isExpandedByDefault={false}
         className="pr-description-section"
+        onToggle={(expanded) => { if (expanded) setDescriptionExpanded(true); }}
       >
-        <PRDescription repoName={repoName} prNumber={pr.number} />
+        <PRDescription repoName={repoName} prNumber={pr.number} enabled={descriptionExpanded} />
       </CollapsibleSection>
 
-      {/* Conversation Section */}
+      {/* Conversation Section - lazy loaded on first expand */}
       <CollapsibleSection 
-        title={`Conversation (${conversationCount})`}
+        title="Conversation"
         isExpandedByDefault={false}
         className="pr-conversation-section"
+        onToggle={(expanded) => { if (expanded) setConversationExpanded(true); }}
       >
-        <PRConversation repoName={repoName} prNumber={pr.number} />
+        <PRConversation repoName={repoName} prNumber={pr.number} enabled={conversationExpanded} />
       </CollapsibleSection>
       
       {/* Reviewer Comments Modal */}

@@ -3063,6 +3063,16 @@ html, body {
   animation: spin 1s linear infinite;
 }
 
+/* Lazy loading state for expandable sections */
+.lazy-loading {
+  min-height: 60px; /* Smaller than default loading */
+  padding: 12px;
+}
+
+.lazy-loading::before {
+  display: none; /* Hide the default hourglass icon */
+}
+
 /* External link icons for cards */
 .pr-external-link,
 .jira-external-link {

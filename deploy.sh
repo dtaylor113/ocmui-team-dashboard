@@ -21,6 +21,7 @@ NC='\033[0m' # No Color
 IMAGE_NAME="ocmui-team-dashboard"
 NAMESPACE="ocmui-dashboard"
 PLATFORM="linux/amd64"
+OPENSHIFT_API="https://api.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com:443"
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}  🚀 OCMUI Team Dashboard - OpenShift Deployment${NC}"
@@ -40,10 +41,14 @@ if ! command -v podman &> /dev/null; then
     exit 1
 fi
 
-# Check if logged into OpenShift
+# Check if logged into OpenShift, auto-login if not
 if ! oc whoami &> /dev/null; then
-    echo -e "${RED}✗ Not logged into OpenShift. Please run 'oc login' first.${NC}"
-    exit 1
+    echo -e "${YELLOW}▶ Not logged in. Opening browser for authentication...${NC}"
+    oc login --web --server="${OPENSHIFT_API}"
+    if ! oc whoami &> /dev/null; then
+        echo -e "${RED}✗ Login failed. Please try again.${NC}"
+        exit 1
+    fi
 fi
 
 CURRENT_USER=$(oc whoami)

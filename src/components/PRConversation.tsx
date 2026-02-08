@@ -6,57 +6,25 @@ import { useSettings } from '../contexts/SettingsContext';
 interface PRConversationProps {
   repoName: string;
   prNumber: number;
+  enabled?: boolean; // For lazy loading - only fetch when true
 }
 
-const PRConversation: React.FC<PRConversationProps> = ({ repoName, prNumber }) => {
-  const { data, isLoading, error } = usePRConversation(repoName, prNumber);
+const PRConversation: React.FC<PRConversationProps> = ({ repoName, prNumber, enabled = true }) => {
+  // Lazy loading: only fetch when enabled (section is expanded)
+  const { data, isLoading, error } = usePRConversation(repoName, prNumber, { enabled });
   const { apiTokens, userPreferences } = useSettings();
   const [parsedComments, setParsedComments] = useState<Record<string, string>>({});
   const [parsingComments, setParsingComments] = useState(false);
-  const [sortMode, setSortMode] = useState<'github_default' | 'most_recent'>('most_recent');
+  const [sortMode, setSortMode] = useState<'github_default' | 'most_recent'>('github_default');
 
-  // Parse comments when data changes
-  useEffect(() => {
-    if (data?.comments && data.comments.length > 0) {
-      setParsingComments(true);
-      const parseCommentsAsync = async () => {
-        const parsed: Record<string, string> = {};
-        
-        for (const comment of data.comments) {
-          if (comment.body) {
-            try {
-              const html = await parseGitHubMarkdownWithCaching(comment.body, apiTokens.github);
-              parsed[comment.id.toString()] = html;
-            } catch (error) {
-              console.error(`Error parsing comment ${comment.id}:`, error);
-              parsed[comment.id.toString()] = comment.body.replace(/\n/g, '<br>');
-            }
-          }
-        }
-        
-        setParsedComments(parsed);
-        setParsingComments(false);
-      };
-      
-      parseCommentsAsync();
-    }
-  }, [data?.comments, apiTokens.github]);
-
-  if (isLoading) {
-    return <div className="loading">Loading conversation...</div>;
-  }
-
-  if (error) {
-    return <div className="error-state">Failed to load conversation: {error.message}</div>;
-  }
-
-  if (!data) {
-    return <div className="error-state">No conversation available</div>;
-  }
-
-  // Process comments based on sort mode
+  // Process comments based on sort mode - MUST be called before any early returns (Rules of Hooks)
   const processedComments = React.useMemo(() => {
     if (!data?.comments) return [];
+    
+    // Filter out bot comments (e.g., jira-linking[bot])
+    const filteredComments = data.comments.filter(
+      (comment: any) => !comment.user?.login?.includes('[bot]')
+    );
     
     if (sortMode === 'github_default') {
       // GitHub Default: Light threading with recency weighting
@@ -64,7 +32,7 @@ const PRConversation: React.FC<PRConversationProps> = ({ repoName, prNumber }) =
       const commentGroups = new Map<string, any[]>();
       const standaloneComments: any[] = [];
       
-      data.comments.forEach(comment => {
+      filteredComments.forEach(comment => {
         if (comment.comment_type === 'inline' && comment.path && comment.line) {
           const groupKey = `${comment.path}:${comment.line}`;
           if (!commentGroups.has(groupKey)) {
@@ -122,7 +90,7 @@ const PRConversation: React.FC<PRConversationProps> = ({ repoName, prNumber }) =
       return result;
     } else {
       // Most Recent: Simple reverse chronological
-      return [...data.comments].sort((a, b) => {
+      return [...filteredComments].sort((a, b) => {
         const dateA = new Date(a.created_at || a.submitted_at).getTime();
         const dateB = new Date(b.created_at || b.submitted_at).getTime();
         return dateB - dateA; // Most recent first
@@ -130,24 +98,70 @@ const PRConversation: React.FC<PRConversationProps> = ({ repoName, prNumber }) =
     }
   }, [data?.comments, sortMode]);
 
+  // Parse comments when data changes
+  useEffect(() => {
+    if (data?.comments && data.comments.length > 0) {
+      setParsingComments(true);
+      const parseCommentsAsync = async () => {
+        const parsed: Record<string, string> = {};
+        
+        for (const comment of data.comments) {
+          if (comment.body) {
+            try {
+              const html = await parseGitHubMarkdownWithCaching(comment.body, apiTokens.github);
+              parsed[comment.id.toString()] = html;
+            } catch (error) {
+              console.error(`Error parsing comment ${comment.id}:`, error);
+              parsed[comment.id.toString()] = comment.body.replace(/\n/g, '<br>');
+            }
+          }
+        }
+        
+        setParsedComments(parsed);
+        setParsingComments(false);
+      };
+      
+      parseCommentsAsync();
+    }
+  }, [data?.comments, apiTokens.github]);
+
+  // Early returns AFTER all hooks have been called (Rules of Hooks)
+  // Show loading spinner when first expanding (lazy loading)
+  if (isLoading) {
+    return (
+      <div className="loading lazy-loading">
+        <span className="loading-spinner"></span>
+        Loading conversation...
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="error-state">Failed to load conversation: {error.message}</div>;
+  }
+
+  if (!data) {
+    return <div className="error-state">No conversation available</div>;
+  }
+
   return (
     <div className="scrollable-content" style={{ maxHeight: "250px" }}>
       {/* Conversation Controls */}
       <div className="conversation-controls">
         <div className="view-toggle">
           <button 
-            className={`toggle-btn ${sortMode === 'most_recent' ? 'active' : ''}`}
-            onClick={() => setSortMode('most_recent')}
-            title="Simple reverse chronological order (newest first)"
-          >
-            ⏰ Most Recent ({data.comments?.length || 0} comments)
-          </button>
-          <button 
             className={`toggle-btn ${sortMode === 'github_default' ? 'active' : ''}`}
             onClick={() => setSortMode('github_default')}
             title="GitHub's default conversation sorting (light threading)"
           >
-            🐙 GitHub Default ({data.comments?.length || 0} comments)
+            🐙 GitHub Default ({processedComments.length} comments)
+          </button>
+          <button 
+            className={`toggle-btn ${sortMode === 'most_recent' ? 'active' : ''}`}
+            onClick={() => setSortMode('most_recent')}
+            title="Simple reverse chronological order (newest first)"
+          >
+            ⏰ Most Recent ({processedComments.length} comments)
           </button>
         </div>
       </div>
