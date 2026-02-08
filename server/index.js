@@ -1849,16 +1849,21 @@ app.get('/api/unleash/flags', async (req, res) => {
         // Combine all flag names from Unleash
         const allUnleashNames = new Set([...stagingMap.keys(), ...prodMap.keys()]);
         
-        // Filter to only flags that are used in the OCMUI codebase (from featureConstants.ts)
-        // Unless showAll=true is passed
+        // Filter by ocmui- prefix (matching compare-envs.js behavior)
+        // Also include any non-prefixed flags that ARE in the codebase
+        const FLAG_PREFIX = 'ocmui-';
+        const codebaseFlagsSet = new Set(codebaseFlags);
+        
         let filteredNames;
-        if (showAll === 'true' || codebaseFlags.length === 0) {
+        if (showAll === 'true') {
             filteredNames = [...allUnleashNames];
-            console.log(`📊 Showing ALL ${filteredNames.length} flags (showAll=true or no codebase filter)`);
+            console.log(`📊 Showing ALL ${filteredNames.length} flags (showAll=true)`);
         } else {
-            const codebaseFlagsSet = new Set(codebaseFlags);
-            filteredNames = [...allUnleashNames].filter(name => codebaseFlagsSet.has(name));
-            console.log(`📊 Filtered to ${filteredNames.length} flags used in codebase (from ${codebaseFlags.length} defined in featureConstants.ts)`);
+            // Include flags that start with ocmui- OR are in the codebase (like compare-envs.js does)
+            filteredNames = [...allUnleashNames].filter(name => 
+                name.startsWith(FLAG_PREFIX) || codebaseFlagsSet.has(name)
+            );
+            console.log(`📊 Filtered to ${filteredNames.length} flags with '${FLAG_PREFIX}' prefix or in codebase`);
         }
         
         // Build comparison data - fetch full details for each flag
@@ -1986,7 +1991,6 @@ app.get('/api/unleash/flags', async (req, res) => {
             const strategy = formatStrategySimple(prodStatus?.strategies || stagingStatus?.strategies);
             
             // Check if this flag is defined in the codebase
-            const codebaseFlagsSet = new Set(codebaseFlags);
             const inCode = codebaseFlagsSet.has(name);
             
             flagsData.push({
