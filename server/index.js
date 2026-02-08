@@ -511,6 +511,8 @@ app.post('/api/jira-ticket', async (req, res) => {
                                 updated: ticketData.fields.updated,
                                 lastUpdatedBy: lastUpdatedBy,
                                 duedate: targetDueDate,
+                                resolutionDate: ticketData.fields.resolutiondate || null,
+                                resolution: ticketData.fields.resolution?.name || null,
                                 comments: comments,
                                 attachments: attachments, // Include attachment URL mapping
                                 parentKey: parentKey,
@@ -1454,6 +1456,8 @@ app.post('/api/jira-epics', async (req, res) => {
         const fields = [
             'key', 'summary', 'status', 'priority', 'assignee',
             'updated',              // Last updated timestamp
+            'resolutiondate',       // When the issue was resolved/closed
+            'resolution',           // Resolution type (Done, Won't Do, etc.)
             'customfield_12313942', // Target end
             'customfield_12319289', // Marketing Impact Notes
             'customfield_12316544', // Blocked Reason
@@ -1573,6 +1577,8 @@ app.post('/api/jira-epics', async (req, res) => {
                                 targetEnd: targetEnd,
                                 updated: fields.updated || null,
                                 lastUpdatedBy: lastUpdatedBy,
+                                resolutionDate: fields.resolutiondate || null,
+                                resolution: fields.resolution?.name || null,
                                 marketingImpactNotes: fields.customfield_12319289 || null,
                                 blockedReason: fields.customfield_12316544 || null,
                                 parentKey: parentKey,

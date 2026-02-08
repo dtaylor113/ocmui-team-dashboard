@@ -215,29 +215,19 @@ const priorityOrder: Record<string, number> = {
   'NONE': 5
 };
 
-// Format relative time for last updated
+// Format date for last updated - always show full date
 const formatRelativeTime = (dateStr: string | null): string => {
   if (!dateStr) return '—';
   
   const date = new Date(dateStr);
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours === 0) {
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      return diffMins <= 1 ? 'just now' : `${diffMins}m ago`;
-    } else {
-      return `${diffHours}h ago`;
-    }
-  } else if (diffDays === 1) {
-    return 'yesterday';
-  } else if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  } else {
+  // Include year if different from current year
+  const sameYear = date.getFullYear() === now.getFullYear();
+  if (sameYear) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } else {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 };
 
@@ -338,6 +328,9 @@ const ParentInfo: React.FC<{ parentKey: string | null; featureKey: string | null
   const status = data?.ticket?.status;
   const updated = data?.ticket?.updated;
   const lastUpdatedBy = data?.ticket?.lastUpdatedBy;
+  const resolutionDate = data?.ticket?.resolutionDate;
+  const resolution = data?.ticket?.resolution;
+  const isClosed = status?.toLowerCase() === 'closed';
   
   return (
     <div className="epics-parent-info">
@@ -367,6 +360,12 @@ const ParentInfo: React.FC<{ parentKey: string | null; featureKey: string | null
           </div>
         ) : null;
       })()}
+      {isClosed && resolutionDate && (
+        <div className="epics-parent-closed-info">
+          <span className="closed-date">Closed: {formatDate(resolutionDate)}</span>
+          {resolution && <span className="closed-resolution">({resolution})</span>}
+        </div>
+      )}
     </div>
   );
 };
@@ -393,7 +392,14 @@ const ParentTargetEnd: React.FC<{ parentKey: string | null; featureKey: string |
 const formatDate = (dateStr: string | null): string => {
   if (!dateStr) return '—';
   const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const now = new Date();
+  // Include year only if different from current year
+  const sameYear = date.getFullYear() === now.getFullYear();
+  if (sameYear) {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } else {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
 };
 
 const getTargetEndColor = (dateStr: string | null): string | null => {
@@ -440,6 +446,7 @@ const getStatusColor = (status: string): string => {
 // Main component
 const EpicsPanel: React.FC = () => {
   const [filter, setFilter] = useState<FilterType>('in-progress');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>('targetEnd');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -510,11 +517,16 @@ const EpicsPanel: React.FC = () => {
     };
   }, [resizing]);
 
-  // Sort epics
+  // Sort and filter epics
   const sortedEpics = useMemo(() => {
     if (!data?.epics) return [];
     
-    const epics = [...data.epics];
+    let epics = [...data.epics];
+    
+    // Apply status filter if set
+    if (statusFilter) {
+      epics = epics.filter(epic => epic.status === statusFilter);
+    }
     
     epics.sort((a, b) => {
       let comparison = 0;
@@ -550,12 +562,13 @@ const EpicsPanel: React.FC = () => {
     });
     
     return epics;
-  }, [data?.epics, sortField, sortDirection]);
+  }, [data?.epics, sortField, sortDirection, statusFilter]);
 
-  // Compute status counts for the current filtered view (must be before early returns)
+  // Compute status counts for the current filtered view (before status filter, must be before early returns)
   const statusCounts = useMemo(() => {
+    if (!data?.epics) return [];
     const counts: Record<string, number> = {};
-    sortedEpics.forEach(epic => {
+    data.epics.forEach(epic => {
       const status = epic.status || 'Unknown';
       counts[status] = (counts[status] || 0) + 1;
     });
@@ -563,7 +576,7 @@ const EpicsPanel: React.FC = () => {
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .map(([status, count]) => ({ status, count }));
-  }, [sortedEpics]);
+  }, [data?.epics]);
 
   // Handle sort click
   const handleSort = (field: SortField) => {
@@ -681,13 +694,14 @@ const EpicsPanel: React.FC = () => {
   }
 
   const showBlockedReason = filter === 'blocked';
+  const showClosedInfo = statusFilter === 'Closed';
 
   return (
     <div className={`epics-panel ${resizing ? 'resizing' : ''}`}>
       {/* Header */}
       <div className="epics-header">
         <div className="epics-header-title">
-          <h2>🟪 OCMUI Team - Active Epics</h2>
+          <h2>OCMUI Team - Active Epics</h2>
           <span className="epics-count">{sortedEpics.length} epics</span>
         </div>
         <div className="epics-header-actions">
@@ -710,41 +724,43 @@ const EpicsPanel: React.FC = () => {
       <div className="epics-filters">
         <button
           className={`epics-filter-btn ${filter === 'in-progress' ? 'active' : ''}`}
-          onClick={() => setFilter('in-progress')}
+          onClick={() => { setFilter('in-progress'); setStatusFilter(null); }}
         >
           In-Progress
         </button>
         <button
           className={`epics-filter-btn ${filter === 'planning' ? 'active' : ''}`}
-          onClick={() => setFilter('planning')}
+          onClick={() => { setFilter('planning'); setStatusFilter(null); }}
         >
           Planning
         </button>
         <button
-          className={`epics-filter-btn ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          All
-        </button>
-        <button
           className={`epics-filter-btn ${filter === 'blocked' ? 'active' : ''}`}
-          onClick={() => setFilter('blocked')}
+          onClick={() => { setFilter('blocked'); setStatusFilter(null); }}
         >
           Blocked
         </button>
+        <button
+          className={`epics-filter-btn ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => { setFilter('all'); setStatusFilter(null); }}
+        >
+          All
+        </button>
       </div>
 
-      {/* Status summary badges */}
+      {/* Status summary badges - clickable filters */}
       {statusCounts.length > 0 && (
         <div className="epics-status-summary">
           {statusCounts.map(({ status, count }) => (
-            <span 
+            <button 
               key={status} 
-              className="epics-status-count-badge"
+              className={`epics-status-count-badge ${statusFilter === status ? 'active' : ''}`}
               style={{ backgroundColor: getStatusColor(status) }}
+              onClick={() => setStatusFilter(statusFilter === status ? null : status)}
+              title={statusFilter === status ? 'Clear filter' : `Filter by ${status}`}
             >
               {status}: {count}
-            </span>
+            </button>
           ))}
         </div>
       )}
@@ -821,6 +837,12 @@ const EpicsPanel: React.FC = () => {
                   onMouseDown={(e) => handleResizeStart('targetEnd', e)}
                 />
               </th>
+              {showClosedInfo && (
+                <>
+                  <th style={{ width: 100 }}>Closed Date</th>
+                  <th style={{ width: 100 }}>Resolution</th>
+                </>
+              )}
               <th style={{ width: columnWidths.parent }}>
                 Parent
                 <div 
@@ -847,7 +869,7 @@ const EpicsPanel: React.FC = () => {
           <tbody>
             {sortedEpics.length === 0 ? (
               <tr>
-                <td colSpan={9} className="epics-empty">
+                <td colSpan={showClosedInfo ? 11 : 9} className="epics-empty">
                   No epics found
                 </td>
               </tr>
@@ -923,6 +945,18 @@ const EpicsPanel: React.FC = () => {
                           <ParentTargetEnd parentKey={epic.parentKey} featureKey={epic.featureKey} />
                         </div>
                       </td>
+                      {showClosedInfo && (
+                        <>
+                          <td className="epics-cell-closed-date">
+                            {formatDate(epic.resolutionDate)}
+                          </td>
+                          <td className="epics-cell-resolution">
+                            <span className="epics-resolution-badge">
+                              {epic.resolution || '—'}
+                            </span>
+                          </td>
+                        </>
+                      )}
                       <td className="epics-cell-parent">
                         <ParentInfo parentKey={epic.parentKey} featureKey={epic.featureKey} />
                       </td>
@@ -944,15 +978,24 @@ const EpicsPanel: React.FC = () => {
                       )}
                       {showBlockedReason && (
                         <td className="epics-cell-blocked">
-                          <div className="epics-blocked-content">
-                            {epic.blockedReason || '—'}
+                          <div className="epics-notes-wrapper">
+                            <div className="epics-blocked-content">
+                              {epic.blockedReason || '—'}
+                            </div>
+                            <button
+                              className="epics-edit-notes-btn"
+                              onClick={() => openEditNotesModal(epic.key, epic.marketingImpactNotes || '')}
+                              title="Edit Marketing Impact Notes"
+                            >
+                              ✏️
+                            </button>
                           </div>
                         </td>
                       )}
                     </tr>
                     {isExpanded && (
                       <tr className="epics-expanded-row">
-                        <td colSpan={9}>
+                        <td colSpan={showClosedInfo ? 11 : 9}>
                           <div className="epics-children-container">
                             <div className="epics-children-label">Child Issues</div>
                             <div className="epics-children-content">

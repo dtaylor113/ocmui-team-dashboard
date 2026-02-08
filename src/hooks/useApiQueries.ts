@@ -941,6 +941,8 @@ interface Epic {
   targetEnd: string | null;
   updated: string | null;
   lastUpdatedBy: string | null;
+  resolutionDate: string | null;
+  resolution: string | null;
   marketingImpactNotes: string | null;
   blockedReason: string | null;
   parentKey: string | null;
