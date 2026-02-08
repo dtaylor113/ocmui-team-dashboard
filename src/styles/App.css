@@ -658,6 +658,30 @@ html, body {
   flex-direction: column;
 }
 
+.timeboard-identity-instructions {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 0 16px 12px 16px;
+  color: #e5e7eb;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.timeboard-identity-instructions strong {
+  color: #60a5fa;
+}
+
+.timeboard-identity-instructions ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+}
+
+.timeboard-identity-instructions li {
+  margin: 4px 0;
+}
+
 .timeboard-table {
   width: 100%;
   border-collapse: collapse;
@@ -850,6 +874,12 @@ html, body {
 .timeboard-btn-primary:hover {
   background: #2563eb;
   border-color: #1d4ed8;
+}
+
+.timeboard-btn-success {
+  background: #059669;
+  border-color: #047857;
+  color: white;
 }
 
 .timeboard-btn-secondary {

@@ -62,7 +62,7 @@ const Header: React.FC<HeaderProps> = ({
             title="Team Timeboard"
             onClick={() => setIsTimeboardModalOpen(true)}
           >
-            🌍
+            👥
           </button>
           <button 
             className={`settings-btn ${!isConfigured ? 'settings-alert-active' : ''}`}

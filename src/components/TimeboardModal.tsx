@@ -38,6 +38,10 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   const [selectedIdentity, setSelectedIdentity] = useState<TeamMember | null>(null);
   const [timeRefreshKey, setTimeRefreshKey] = useState(0); // For triggering time updates
   
+  // Refresh button state
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshStatus, setRefreshStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  
   // No separate form; inline row editing uses draftMember
 
   // Utilities for safe timezone handling
@@ -90,7 +94,13 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     return () => clearInterval(interval);
   }, [isOpen, referenceMode]);
 
-  const loadMembers = async () => {
+  const loadMembers = async (showStatus = false) => {
+    if (showStatus) {
+      setRefreshing(true);
+      setRefreshStatus('idle');
+    }
+    
+    let success = false;
     try {
       // Try server API first (Phase 4 - shared roster)
       const response = await fetch('/api/team/members');
@@ -108,6 +118,12 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
             .filter((m: any) => isValidTimezone(m.tz));
           setMembers(cleaned);
           console.log(`🕐 Loaded ${cleaned.length} team members from server (${data.source})`);
+          success = true;
+          if (showStatus) {
+            setRefreshing(false);
+            setRefreshStatus('success');
+            setTimeout(() => setRefreshStatus('idle'), 2000);
+          }
           return;
         }
       }
@@ -132,6 +148,12 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
             .filter((m: any) => isValidTimezone(m.tz));
           setMembers(cleaned);
           console.log(`🕐 Loaded ${customMembers.length} team members from localStorage`);
+          success = true;
+          if (showStatus) {
+            setRefreshing(false);
+            setRefreshStatus('success');
+            setTimeout(() => setRefreshStatus('idle'), 2000);
+          }
           return;
         }
       }
@@ -151,9 +173,16 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
         .filter((m: any) => isValidTimezone(m.tz));
       setMembers(cleaned);
       console.log(`🕐 Loaded ${membersData.length} team members from JSON`);
+      success = true;
     } catch (error) {
       console.error('🕐 Failed to load members:', error);
       setMembers([]);
+    }
+    
+    if (showStatus) {
+      setRefreshing(false);
+      setRefreshStatus(success ? 'success' : 'error');
+      setTimeout(() => setRefreshStatus('idle'), 2000);
     }
   };
 
@@ -561,9 +590,6 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     cancelEdit();
   };
 
-  // Note: Export, Reload, and Add buttons removed for security (Phase 4)
-  // Admin roster management is done via oc CLI or git seed file
-
   // (Removed legacy timezoneOptions; using allTimezones instead)
 
   if (!isOpen) return null;
@@ -573,7 +599,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       <div className="timeboard-modal-content">
         <div className="timeboard-modal-header">
           <div className="timeboard-header-left">
-            <h1>🌍 OCMUI Team Timeboard</h1>
+            <h1>👥 OCMUI Team Timeboard</h1>
             <div className="timeboard-current-time">
               Your local time: {currentLocalTime}
             </div>
@@ -627,14 +653,41 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                 {getIdentityButtonText()}
                 {!selectedIdentity && <span className="identity-alert">!</span>}
               </button>
+              
+              {showIdentitySelection && (
+                <button
+                  className="timeboard-btn timeboard-btn-secondary timeboard-btn-small"
+                  onClick={() => setShowIdentitySelection(false)}
+                  title="Cancel identity selection"
+                >
+                  Cancel
+                </button>
+              )}
 
-              <button
-                className="timeboard-btn timeboard-btn-small"
-                title="Refresh team roster from server"
-                onClick={loadMembers}
-              >
-                🔄 Refresh
-              </button>
+              {!showIdentitySelection && (
+                <>
+                  <button
+                    className={`timeboard-btn timeboard-btn-small ${refreshStatus === 'success' ? 'timeboard-btn-success' : ''}`}
+                    title="Refresh team roster from server (pulls changes made by teammates)"
+                    onClick={() => loadMembers(true)}
+                    disabled={refreshing}
+                  >
+                    {refreshing ? '⏳ Refreshing...' : refreshStatus === 'success' ? '✅ Refreshed!' : '🔄 Refresh'}
+                  </button>
+                  
+                  <button
+                    className="timeboard-btn timeboard-btn-primary timeboard-btn-small"
+                    title="Add a new team member"
+                    onClick={() => {
+                      setEditingIndex(-1);
+                      setDraftMember({ name: '', role: '', tz: 'America/New_York', github: '', jira: '' });
+                    }}
+                    disabled={editingIndex !== null}
+                  >
+                    + Add
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -679,6 +732,17 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         <main className="timeboard-main">
+          {/* Identity selection instructions */}
+          {showIdentitySelection && (
+            <div className="timeboard-identity-instructions">
+              <strong>Select yourself from the list below.</strong> This sets your identity for the entire dashboard:
+              <ul>
+                <li>Your <strong>GitHub username</strong> will be used to filter PR reviews and workload</li>
+                <li>Your <strong>JIRA email</strong> will be used to filter tickets assigned to you</li>
+                <li>Your <strong>timezone</strong> will be set as your preference</li>
+              </ul>
+            </div>
+          )}
           <table className="timeboard-table">
             <thead>
               <tr>
@@ -691,6 +755,83 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
               </tr>
             </thead>
             <tbody>
+              {/* New member row (when adding) */}
+              {editingIndex === -1 && (
+                <tr className="timeboard-new-row">
+                  {showIdentitySelection && <td></td>}
+                  <td colSpan={showIdentitySelection ? 6 : 5} style={{ padding: '12px 16px', backgroundColor: 'rgba(59, 130, 246, 0.15)', borderRadius: '4px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', alignItems: 'end' }}>
+                      {/* Name */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Name *</label>
+                        <input
+                          type="text"
+                          value={draftMember.name}
+                          onChange={(e) => setDraftMember(prev => ({ ...prev, name: e.target.value }))}
+                          style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                          maxLength={25}
+                          autoFocus
+                          placeholder="Full name"
+                        />
+                      </div>
+                      {/* Role */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Role *</label>
+                        <input
+                          type="text"
+                          value={draftMember.role}
+                          onChange={(e) => setDraftMember(prev => ({ ...prev, role: e.target.value }))}
+                          style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                          maxLength={25}
+                          placeholder="e.g., dev, qe lead"
+                        />
+                      </div>
+                      {/* Timezone */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>Timezone *</label>
+                        <select
+                          value={draftMember.tz}
+                          onChange={(e) => setDraftMember(prev => ({ ...prev, tz: e.target.value }))}
+                          style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                        >
+                          {tzWithSort.map(tz => (
+                            <option key={tz} value={tz}>{getTimezoneLabel(tz)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {/* GitHub Username */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>GitHub username</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., octocat"
+                          value={draftMember.github || ''}
+                          onChange={(e) => setDraftMember(prev => ({ ...prev, github: e.target.value }))}
+                          style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                          maxLength={40}
+                        />
+                      </div>
+                      {/* JIRA Email */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>JIRA email</label>
+                        <input
+                          type="email"
+                          placeholder="e.g., user@redhat.com"
+                          value={draftMember.jira || ''}
+                          onChange={(e) => setDraftMember(prev => ({ ...prev, jira: e.target.value }))}
+                          style={{ padding: '6px 8px', width: '100%', boxSizing: 'border-box' }}
+                          maxLength={60}
+                        />
+                      </div>
+                      {/* Action Buttons */}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'end', paddingBottom: 2 }}>
+                        <button className="timeboard-btn timeboard-btn-primary timeboard-btn-small" onClick={saveDraft}>Save</button>
+                        <button className="timeboard-btn timeboard-btn-secondary timeboard-btn-small" onClick={cancelEdit}>Cancel</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {displayMembers.map((member) => (
                 <tr 
                   key={`${member.name}-${member.tz}`}
@@ -790,26 +931,29 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
                         <td className="mono">{member.tz}</td>
                         <td className={`mono ${member.off ? 'warn' : ''}`}>{member.local}</td>
                         <td className="mono">{member.offset}</td>
-                        <td>
-                          <button
-                            className="timeboard-btn timeboard-btn-secondary timeboard-btn-small"
-                            onClick={() => startEditByKey({ name: member.name, tz: member.tz })}
-                            title="Edit member"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className="timeboard-btn timeboard-btn-danger timeboard-btn-small"
-                            onClick={() => {
-                              const delIdx = members.findIndex(m => m.name === member.name && m.tz === member.tz);
-                              if (delIdx >= 0) deleteMember(delIdx);
-                            }}
-                            title="Delete member"
-                            style={{ marginLeft: '6px' }}
-                          >
-                            🗑️
-                          </button>
-                        </td>
+                        {/* Hide edit/delete buttons while in identity selection mode */}
+                        {!showIdentitySelection && (
+                          <td>
+                            <button
+                              className="timeboard-btn timeboard-btn-secondary timeboard-btn-small"
+                              onClick={() => startEditByKey({ name: member.name, tz: member.tz })}
+                              title="Edit member"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              className="timeboard-btn timeboard-btn-danger timeboard-btn-small"
+                              onClick={() => {
+                                const delIdx = members.findIndex(m => m.name === member.name && m.tz === member.tz);
+                                if (delIdx >= 0) deleteMember(delIdx);
+                              }}
+                              title="Delete member"
+                              style={{ marginLeft: '6px' }}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        )}
                       </>
                     );
                   })()}

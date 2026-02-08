@@ -403,6 +403,104 @@ Current User Experience
 
 ---
 
+## Phase 11 – Multi-Team Configuration (Future)
+
+Goal: Make the dashboard reusable by any team, not just OCMUI.
+
+### Current Hardcoded Values
+
+| Component | Hardcoded Value | Location |
+|-----------|----------------|----------|
+| GitHub Repo | `RedHatInsights/uhc-portal` | `server/index.js`, Reviewer Workload |
+| JIRA Instance | `https://issues.redhat.com` | `server/index.js` |
+| JIRA Project | `OCMUI` | JQL queries in server |
+| Feature Flag Prefix | `ocmui-` | `config.js` |
+| Team Name | "OCMUI" | Various component titles |
+| Epic Parent | Specific epic key | Server queries |
+
+### Phase 11.1: Core Settings Infrastructure
+
+Scope
+- Add to Settings modal:
+  - **Team Name** (for branding: "My OCMUI Dashboard" → "My {TeamName} Dashboard")
+  - **GitHub Repo** (e.g., `RedHatInsights/uhc-portal`)
+  - **JIRA Instance URL** (e.g., `https://issues.redhat.com`)
+  - **JIRA Project Key** (e.g., `OCMUI`)
+- Store in Settings context + localStorage
+- Server reads from request headers or query params
+- Update all components to use configured values instead of hardcoded
+
+Acceptance
+- User can change GitHub repo and see PR/Review data from that repo
+- User can change JIRA project and see epics/tickets from that project
+- Dashboard title reflects configured team name
+
+### Phase 11.2: Feature Flags Configuration
+
+Scope
+- **Feature Flag Prefix** (e.g., `ocmui-`, `acm-`, etc.)
+- **Feature Constants Path** (path to codebase feature constants file)
+- **Unleash URLs** (staging/prod) - optional, or keep server-side only for security
+
+Acceptance
+- Feature Flags panel shows flags matching configured prefix
+- "In Code?" column checks the configured constants file
+
+### Phase 11.3: Epics Configuration
+
+Scope
+- **Parent Epic Key** (the epic that contains all team epics)
+- **Custom JQL filters** (optional, for advanced users)
+- **Custom field mappings** (Marketing Impact Notes field ID, etc.)
+
+Acceptance
+- Epics panel shows epics from configured project/parent
+- Custom fields work with different JIRA configurations
+
+### Phase 11.4: Multi-Profile Support (Optional)
+
+Scope
+- Save/load different team configurations as named profiles
+- Quick-switch dropdown between teams
+- Export/import team config as JSON
+- Share config URL with team members
+
+Acceptance
+- User can save "OCMUI" profile, create "ACM" profile, switch between them
+- Config can be shared via URL or JSON export
+
+### Implementation Notes
+
+**Settings Storage**
+```typescript
+interface TeamConfig {
+  teamName: string;
+  github: {
+    repo: string;  // e.g., "RedHatInsights/uhc-portal"
+  };
+  jira: {
+    instanceUrl: string;  // e.g., "https://issues.redhat.com"
+    projectKey: string;   // e.g., "OCMUI"
+    parentEpicKey?: string;
+  };
+  unleash: {
+    flagPrefix: string;   // e.g., "ocmui-"
+  };
+}
+```
+
+**Server Changes**
+- All API endpoints accept optional `X-Team-Config` header or query params
+- Fallback to environment variables for backwards compatibility
+- Consider multi-tenant token storage (different tokens per JIRA instance)
+
+**Migration Path**
+- Phase 11.1 can be implemented incrementally
+- Existing hardcoded values become defaults
+- No breaking changes for current OCMUI users
+
+---
+
 ## Branching and Repos
 
 **Current approach** (simplified):
@@ -450,6 +548,7 @@ Notes
 - [x] Phase 9 reviewer workload - complete! 👥
 - [x] Phase 10 quick find & navigation improvements - complete! 🔍
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
+- [ ] Phase 11 multi-team configuration (future) 🔧
 
 
 ---
