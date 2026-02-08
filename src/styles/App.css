@@ -4743,7 +4743,7 @@ body.dark-theme .github-image-fallback:hover {
 }
 
 .ff-modified {
-  font-size: 11px;
+  font-size: 13px;
   color: #6b7280;
 }
 
@@ -5693,7 +5693,7 @@ body.dark-theme .github-image-fallback:hover {
 }
 
 .epics-last-updated {
-  font-size: 11px;
+  font-size: 13px;
   color: #6b7280;
   margin-top: 4px;
   line-height: 1.4;

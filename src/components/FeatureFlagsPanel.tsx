@@ -289,7 +289,7 @@ const FeatureFlagsPanel: React.FC = () => {
               <th className="ff-th-env">Stage</th>
               <th className="ff-th-env">Prod</th>
               <th className="ff-th-strategy">Strategy</th>
-              <th className="ff-th-status">Status / Last Modified (Prod)</th>
+              <th className="ff-th-status">Status / Last Modified (Prod or fallback to Stage)</th>
             </tr>
           </thead>
           <tbody>

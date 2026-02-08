@@ -2014,9 +2014,16 @@ app.get('/api/unleash/flags', async (req, res) => {
             });
         }
         
-        // Sort: mismatches first, then alphabetically
+        // Sort: by most recent modified date (newest first), then alphabetically
         flagsData.sort((a, b) => {
-            if (a.mismatch !== b.mismatch) return b.mismatch ? 1 : -1;
+            // Both have dates: sort by date descending
+            if (a.modifiedAt && b.modifiedAt) {
+                return new Date(b.modifiedAt) - new Date(a.modifiedAt);
+            }
+            // One has date, one doesn't: dated ones first
+            if (a.modifiedAt && !b.modifiedAt) return -1;
+            if (!a.modifiedAt && b.modifiedAt) return 1;
+            // Neither has date: alphabetical
             return a.name.localeCompare(b.name);
         });
         
