@@ -220,13 +220,13 @@ const DocLinksPanel: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading || refreshing) {
     return (
       <div className="dl-panel">
         <div className="dl-loading">
           <div className="dl-loading-spinner"></div>
           <p className="dl-progress-message">
-            {progress?.message || 'Checking documentation links...'}
+            {progress?.message || (refreshing ? 'Re-checking documentation links...' : 'Checking documentation links...')}
           </p>
           {progress && progress.total > 0 && (
             <div className="dl-progress-bar-container">
@@ -240,7 +240,7 @@ const DocLinksPanel: React.FC = () => {
             {progress?.stage === 'fetching' && 'Connecting to uhc-portal...'}
             {progress?.stage === 'checking' && `${progress.current} of ${progress.total} URLs checked`}
             {progress?.stage === 'redirects' && `${progress.current} of ${progress.total} redirects verified`}
-            {!progress && 'This may take a moment for the first load'}
+            {!progress && (refreshing ? 'Refreshing cached data...' : 'This may take a moment for the first load')}
           </small>
         </div>
       </div>
