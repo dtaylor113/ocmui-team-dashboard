@@ -1431,8 +1431,8 @@ app.post('/api/jira-epics', async (req, res) => {
                 jql = `project = OCMUI AND issuetype = Epic AND Blocked = "False" AND (status != Closed OR resolved >= -90d) ORDER BY "Target end" ASC`;
                 break;
             case 'blocked':
-                // Blocked OCMUI epics with ui-active-item label
-                jql = `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "True" ORDER BY "Target end" ASC`;
+                // Blocked OCMUI epics (no label filter - show all blocked)
+                jql = `project = OCMUI AND issuetype = Epic AND Blocked = "True" ORDER BY "Target end" ASC`;
                 break;
             case 'planning':
                 // Planning OCMUI epics (ui-active-item label, unblocked, status = New/Refinement/Backlog/To Do)
@@ -1440,8 +1440,9 @@ app.post('/api/jira-epics', async (req, res) => {
                 break;
             case 'in-progress':
             default:
-                // In-Progress OCMUI epics (ui-active-item label, unblocked, status = In Progress/Code Review)
-                jql = `project = OCMUI AND labels in ('ui-active-item') AND issuetype = Epic AND Blocked = "False" AND status in ("In Progress", "Code Review", Review) ORDER BY "Target end" ASC`;
+                // In-Progress OCMUI epics (unblocked, status = In Progress/Code Review/Review)
+                // Note: No ui-active-item label required - if it's In Progress, it's active
+                jql = `project = OCMUI AND issuetype = Epic AND Blocked = "False" AND status in ("In Progress", "Code Review", Review) ORDER BY "Target end" ASC`;
                 break;
         }
 

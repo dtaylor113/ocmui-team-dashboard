@@ -147,6 +147,62 @@ Prerequisites
 
 ---
 
+## Phase 3.6 – True Service Account Tokens (Security Enhancement)
+
+Goal: Replace personal access tokens with proper service account credentials.
+
+### Current State (Security Concern)
+
+The tokens currently stored in OpenShift Secrets are **personal access tokens** tied to an individual's account:
+
+| Token | Current Reality | Security Implications |
+|-------|----------------|----------------------|
+| `GITHUB_TOKEN` | Personal Access Token (PAT) tied to someone's GitHub account (e.g., `dtaylor113`) | All API calls appear as this user; rate limits apply to their account |
+| `JIRA_TOKEN` | API token tied to someone's Atlassian account (e.g., `dtaylor@redhat.com`) | All JIRA actions attributed to this person |
+
+### Risks
+
+1. **Audit Trail**: All dashboard API calls show as coming from one person's account
+2. **Accountability**: That individual is "responsible" for all actions the dashboard takes
+3. **Lifecycle**: If the person leaves the team/company, tokens must be rotated
+4. **Permissions**: Tokens inherit that user's full permissions (may be more than needed)
+5. **Rate Limits**: Shared rate limit quota across personal use + dashboard use
+
+### Recommended Solution
+
+| Platform | Proper Service Account |
+|----------|----------------------|
+| **GitHub** | Create a dedicated bot account (e.g., `ocmui-dashboard-bot`) with its own PAT, or better yet, create a **GitHub App** with installation tokens (more granular permissions, better audit trail) |
+| **JIRA** | Request a dedicated service account from Red Hat IT (e.g., `ocmui-dashboard-svc@redhat.com`) with minimal required permissions |
+
+### Implementation Steps
+
+1. **GitHub Option A - Bot Account**:
+   - Create a new GitHub account for the dashboard
+   - Generate a PAT with minimal scopes (`repo:read`, `pull_request:read`)
+   - Update OpenShift Secret with new token
+
+2. **GitHub Option B - GitHub App** (Preferred):
+   - Register a GitHub App in the organization
+   - Configure with minimal permissions (read-only for repos, PRs, issues)
+   - Generate installation token in server code
+   - Better audit trail and security
+
+3. **JIRA**:
+   - Open IT ticket to request a service account
+   - Configure with read-only access to required projects
+   - Update OpenShift Secret with new token
+
+### Benefits
+
+- Clear separation of personal vs service actions
+- Easier token rotation without impacting individuals
+- Minimal permissions (principle of least privilege)
+- Better audit compliance
+- No single point of failure tied to one person
+
+---
+
 ## Phase 4 – Shared Team Roster Persistence ✅ COMPLETE
 
 Goal: Replace per-browser `localStorage` editing with a team-shared persistence.
@@ -548,6 +604,7 @@ Notes
 - [x] Phase 9 reviewer workload - complete! 👥
 - [x] Phase 10 quick find & navigation improvements - complete! 🔍
 - [ ] Phase 3.5 Red Hat SSO integration (optional)
+- [ ] Phase 3.6 true service account tokens (security) 🔐
 - [ ] Phase 11 multi-team configuration (future) 🔧
 
 

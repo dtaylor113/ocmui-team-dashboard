@@ -5727,10 +5727,13 @@ body.dark-theme .github-image-fallback:hover {
   color: #6b7280;
   margin-top: 4px;
   line-height: 1.4;
+  white-space: normal;
 }
 
 .epics-last-updated .updated-line1 {
-  white-space: nowrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .epics-last-updated .updated-line2 {
@@ -5740,6 +5743,7 @@ body.dark-theme .github-image-fallback:hover {
 
 .epics-parent-info .epics-last-updated {
   margin-top: 4px;
+  white-space: normal;
 }
 
 .epics-link {
