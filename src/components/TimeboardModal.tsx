@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
+import { auditFetch, identifyUser } from '../utils/auditFetch';
 import slackIcon from '../assets/slack-dark-theme-icon.png';
 
 interface TeamMember {
@@ -103,7 +104,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     let success = false;
     try {
       // Try server API first (Phase 4 - shared roster)
-      const response = await fetch('/api/team/members');
+      const response = await auditFetch('/api/team/members');
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.members)) {
@@ -189,7 +190,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   // Add a member via API (or localStorage fallback)
   const addMemberApi = async (member: TeamMember): Promise<boolean> => {
     try {
-      const response = await fetch('/api/team/members', {
+      const response = await auditFetch('/api/team/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(member)
@@ -213,7 +214,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   // Update a member via API (or localStorage fallback)
   const updateMemberApi = async (originalName: string, member: TeamMember): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/team/members/${encodeURIComponent(originalName)}`, {
+      const response = await auditFetch(`/api/team/members/${encodeURIComponent(originalName)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(member)
@@ -234,7 +235,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
   // Delete a member via API (or localStorage fallback)
   const deleteMemberApi = async (name: string): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/team/members/${encodeURIComponent(name)}`, {
+      const response = await auditFetch(`/api/team/members/${encodeURIComponent(name)}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -475,7 +476,7 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
     setShowIdentitySelection(!showIdentitySelection);
   };
 
-  const handleIdentitySelection = (member: TeamMember) => {
+  const handleIdentitySelection = async (member: TeamMember) => {
     setSelectedIdentity(member);
     setShowIdentitySelection(false);
     
@@ -489,6 +490,9 @@ const TimeboardModal: React.FC<TimeboardModalProps> = ({ isOpen, onClose }) => {
       github: member.github,
       jira: member.jira
     }));
+    
+    // Log the identity change for audit trail
+    await identifyUser(member.name);
     
     // Propagate github/jira usernames to Settings context if available
     // This ensures API queries use the correct identity

@@ -304,6 +304,19 @@ const SettingsModal: React.FC = () => {
                 </section>
 
                 <section>
+                  <h4>📜 Audit Logging</h4>
+                  <p>
+                    All API access is logged with <strong>full audit trails</strong>. Each request records the 
+                    timestamp, endpoint accessed, team member identity, IP address, and response status. Logs 
+                    are stored on the server's persistent volume with automatic rotation.
+                  </p>
+                  <p style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>
+                    Admins can view audit data via: <code>/api/audit/stats</code>, <code>/api/audit/logs</code>, 
+                    and <code>/api/audit/users</code>, or use the <code>scripts/audit-report.sh</code> CLI tool.
+                  </p>
+                </section>
+
+                <section>
                   <h4>🚀 Future: Red Hat SSO</h4>
                   <p>
                     We plan to integrate <strong>Red Hat SSO</strong> (Single Sign-On) for authentication. This 

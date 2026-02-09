@@ -1,0 +1,54 @@
+{
+  "totalRequests": 17,
+  "uniqueUsers": {
+    "anonymous": {
+      "firstSeen": "2026-02-09T21:46:03.329Z",
+      "lastSeen": "2026-02-09T21:46:15.889Z",
+      "requestCount": 3,
+      "teamMember": null,
+      "authUser": "anonymous"
+    },
+    "Dave Taylor": {
+      "firstSeen": "2026-02-09T21:46:09.858Z",
+      "lastSeen": "2026-02-09T21:58:49.424Z",
+      "requestCount": 12,
+      "teamMember": "Dave Taylor",
+      "authUser": "anonymous"
+    },
+    "Zac Herman": {
+      "firstSeen": "2026-02-09T21:46:10.335Z",
+      "lastSeen": "2026-02-09T21:46:10.335Z",
+      "requestCount": 1,
+      "teamMember": "Zac Herman",
+      "authUser": "anonymous"
+    },
+    "Dylan Cooper": {
+      "firstSeen": "2026-02-09T21:46:10.350Z",
+      "lastSeen": "2026-02-09T21:46:10.350Z",
+      "requestCount": 1,
+      "teamMember": "Dylan Cooper",
+      "authUser": "anonymous"
+    }
+  },
+  "endpointHits": {
+    "/api/audit/users": 2,
+    "/api/team/members": 4,
+    "/api/jira/status": 1,
+    "/api/github/status": 1,
+    "/api/audit/stats": 1,
+    "/api/jira-epics": 1,
+    "/api/jira-ticket": 7
+  },
+  "dailyActivity": {
+    "2026-02-09": {
+      "requests": 17,
+      "users": [
+        "anonymous",
+        "Dave Taylor",
+        "Zac Herman",
+        "Dylan Cooper"
+      ]
+    }
+  },
+  "serverStartTime": "2026-02-09T21:58:39.566Z"
+}

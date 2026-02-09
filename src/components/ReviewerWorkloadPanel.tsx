@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useReviewerWorkload, useLastUpdatedFormat } from '../hooks/useApiQueries';
+import { auditFetch } from '../utils/auditFetch';
 
 interface TeamMember {
   name: string;
@@ -19,7 +20,7 @@ const ReviewerWorkloadPanel: React.FC = () => {
   useEffect(() => {
     const fetchTeamRoster = async () => {
       try {
-        const response = await fetch('/api/team/members');
+        const response = await auditFetch('/api/team/members');
         if (response.ok) {
           const result = await response.json();
           const members = result.members || [];

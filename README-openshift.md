@@ -199,6 +199,143 @@ oc rollout restart deployment/ocmui-team-dashboard
 
 ---
 
+## Access Logging & Audit Trail
+
+The dashboard tracks all API access for security auditing. Logs are stored in the PVC at `/data/access.log`.
+
+### View Usage Statistics
+
+```bash
+curl -s https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com/api/audit/stats | jq .
+```
+
+Returns:
+- Total requests and unique users
+- Team members who have used the dashboard
+- Daily activity breakdown
+- Top endpoints accessed
+
+### View Dashboard Users
+
+```bash
+curl -s https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com/api/audit/users | jq .
+```
+
+Shows which team members are actively using the dashboard, including:
+- First seen / last seen timestamps
+- Request count per user
+- Whether they're in the team roster
+
+### View Recent Access Logs
+
+```bash
+# Get last 100 log entries
+curl -s https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com/api/audit/logs | jq .
+
+# Filter by user
+curl -s "https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com/api/audit/logs?user=Dave%20Taylor" | jq .
+
+# Filter by date
+curl -s "https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com/api/audit/logs?date=2026-02-09" | jq .
+
+# Filter by endpoint
+curl -s "https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com/api/audit/logs?path=/api/jira" | jq .
+```
+
+### View Raw Log File
+
+```bash
+oc rsh deployment/ocmui-team-dashboard cat /data/access.log
+```
+
+Each log entry contains:
+- `timestamp` - When the request occurred
+- `method` - HTTP method (GET, POST, etc.)
+- `path` - API endpoint accessed
+- `teamMember` - Who made the request (from frontend identity)
+- `authUser` - Basic Auth username
+- `ip` - Client IP address
+- `statusCode` - HTTP response code
+- `duration` - Request duration in ms
+
+### Clear Old Logs
+
+```bash
+# Delete logs older than a specific date
+curl -X DELETE "https://ocmui-team-dashboard-ocmui-dashboard.apps.rosa.c9a9m7g8h3p4x6t.rz7k.p3.openshiftapps.com/api/audit/logs?before=2026-01-01T00:00:00Z"
+```
+
+### Log Rotation
+
+Logs automatically rotate when the file exceeds 10MB. Up to 5 rotated files are kept (`access.log.1`, `access.log.2`, etc.).
+
+### Audit Report Script
+
+A CLI script is provided for generating formatted audit reports:
+
+```bash
+# Show help
+./scripts/audit-report.sh --help
+
+# Today's activity on production ROSA
+./scripts/audit-report.sh
+
+# Last week on production
+./scripts/audit-report.sh --week
+
+# Last 3 weeks
+./scripts/audit-report.sh --3weeks
+
+# Custom date range
+./scripts/audit-report.sh --start 2026-01-15 --end 2026-02-01
+
+# Filter by user
+./scripts/audit-report.sh --week --user "Dave Taylor"
+
+# Summary only (no individual logs)
+./scripts/audit-report.sh --month --summary
+
+# Against local dev server instead of ROSA
+./scripts/audit-report.sh --local --today
+
+# Raw JSON output (for scripting)
+./scripts/audit-report.sh --week --json
+```
+
+**Time Range Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--today` | Current day (default) |
+| `--yesterday` | Previous day |
+| `--week` | Last 7 days |
+| `--2weeks` | Last 14 days |
+| `--3weeks` | Last 21 days |
+| `--month` | Last 30 days |
+| `--start DATE --end DATE` | Custom range (YYYY-MM-DD) |
+
+**Server Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--prod` | Production ROSA cluster (default) |
+| `--local` | Local dev server (localhost:3017) |
+| `--url URL` | Custom server URL |
+| `--auth USER:PASS` | Basic auth credentials |
+
+**Authentication:** Production requires Basic Auth. Pass credentials via `--auth` or set `DASHBOARD_AUTH` env var:
+
+```bash
+# Option 1: Use --auth flag
+./scripts/audit-report.sh --prod --auth "username:password"
+
+# Option 2: Set environment variable
+export DASHBOARD_AUTH="username:password"
+./scripts/audit-report.sh --prod
+```
+
+---
+
 ## Troubleshooting
 
 ### Check Pod Status
@@ -311,6 +448,8 @@ oc login <api-url> --username=cluster-admin --password=<generated-password>
 2. **Route TLS**: The default route uses edge TLS termination (HTTPS).
 3. **Non-root**: The container runs as a non-root user (UID 1001).
 4. **Network Policy**: Consider adding NetworkPolicy for production.
+5. **Audit Logging**: All API access is logged with user identity, timestamps, and IP addresses. See "Access Logging & Audit Trail" section above.
+6. **Basic Auth**: Dashboard is protected with shared username/password. Consider upgrading to Red Hat SSO for stronger authentication.
 
 ---
 
@@ -322,7 +461,11 @@ oc login <api-url> --username=cluster-admin --password=<generated-password>
 | `openshift/deployment.yaml` | Pod deployment configuration |
 | `openshift/service.yaml` | Internal ClusterIP service |
 | `openshift/route.yaml` | External HTTPS route |
-| `openshift/pvc.yaml` | PersistentVolumeClaim for team roster data |
+| `openshift/pvc.yaml` | PersistentVolumeClaim for team roster and audit logs |
 | `openshift/secrets.example.yaml` | Template for tokens (GitHub, JIRA, Unleash) |
 | `openshift/kustomization.yaml` | Kustomize configuration |
 | `deploy.sh` | Automated build and deploy script |
+| `scripts/audit-report.sh` | CLI tool for generating audit reports |
+| `/data/members.json` | Team roster (on PVC) |
+| `/data/access.log` | Access audit log (on PVC) |
+| `/data/usage-stats.json` | Aggregated usage statistics (on PVC) |

@@ -3,6 +3,7 @@ import { useJiraTicket } from '../hooks/useApiQueries';
 import { useSettings } from '../contexts/SettingsContext';
 import { formatJiraTimestamp } from '../utils/formatting';
 import { PriorityIcon, getPriorityColor } from '../utils/priorityIcons';
+import { auditFetch } from '../utils/auditFetch';
 
 interface JiraTicket {
   key: string;
@@ -76,7 +77,7 @@ const JiraHierarchyModal: React.FC<JiraHierarchyModalProps> = ({ jiraKey, isOpen
         level++;
         
         try {
-          const response = await fetch('/api/jira-ticket', {
+          const response = await auditFetch('/api/jira-ticket', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

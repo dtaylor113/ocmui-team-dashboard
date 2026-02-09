@@ -10,11 +10,115 @@ const app = express();
 const PORT = process.env.PORT || 3017;
 
 // ============================================================================
+// ACCESS LOGGING SYSTEM
+// ============================================================================
+
+// Log directory (same as data directory for PVC persistence)
+const LOG_DIR = process.env.LOG_DIR || process.env.DATA_DIR || path.join(__dirname, '../data');
+const ACCESS_LOG_FILE = path.join(LOG_DIR, 'access.log');
+const MAX_LOG_SIZE = 10 * 1024 * 1024; // 10MB before rotation
+const MAX_LOG_FILES = 5; // Keep 5 rotated logs
+
+// Ensure log directory exists
+const ensureLogDir = () => {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+    console.log(`📁 Created log directory: ${LOG_DIR}`);
+  }
+};
+
+// Rotate log files if needed
+const rotateLogsIfNeeded = () => {
+  try {
+    if (!fs.existsSync(ACCESS_LOG_FILE)) return;
+    
+    const stats = fs.statSync(ACCESS_LOG_FILE);
+    if (stats.size < MAX_LOG_SIZE) return;
+    
+    // Rotate existing logs
+    for (let i = MAX_LOG_FILES - 1; i >= 1; i--) {
+      const oldFile = `${ACCESS_LOG_FILE}.${i}`;
+      const newFile = `${ACCESS_LOG_FILE}.${i + 1}`;
+      if (fs.existsSync(oldFile)) {
+        if (i === MAX_LOG_FILES - 1) {
+          fs.unlinkSync(oldFile); // Delete oldest
+        } else {
+          fs.renameSync(oldFile, newFile);
+        }
+      }
+    }
+    
+    // Rotate current log
+    fs.renameSync(ACCESS_LOG_FILE, `${ACCESS_LOG_FILE}.1`);
+    console.log('📜 Rotated access log files');
+  } catch (err) {
+    console.error('❌ Failed to rotate logs:', err.message);
+  }
+};
+
+// Write access log entry
+const writeAccessLog = (entry) => {
+  ensureLogDir();
+  rotateLogsIfNeeded();
+  
+  const logLine = JSON.stringify(entry) + '\n';
+  try {
+    fs.appendFileSync(ACCESS_LOG_FILE, logLine, 'utf8');
+  } catch (err) {
+    console.error('❌ Failed to write access log:', err.message);
+  }
+};
+
+// In-memory usage statistics (reset on server restart, persisted periodically)
+const USAGE_STATS_FILE = path.join(LOG_DIR, 'usage-stats.json');
+let usageStats = {
+  totalRequests: 0,
+  uniqueUsers: {},      // { "username": { firstSeen, lastSeen, requestCount, teamMember } }
+  endpointHits: {},     // { "/api/jira-sprint-tickets": count }
+  dailyActivity: {},    // { "2026-02-09": { requests: count, users: ["user1", "user2"] } }
+  serverStartTime: new Date().toISOString()
+};
+
+// Load usage stats from disk
+const loadUsageStats = () => {
+  try {
+    if (fs.existsSync(USAGE_STATS_FILE)) {
+      const data = fs.readFileSync(USAGE_STATS_FILE, 'utf8');
+      const loaded = JSON.parse(data);
+      // Merge with fresh stats (keep serverStartTime fresh)
+      usageStats = { ...loaded, serverStartTime: new Date().toISOString() };
+      console.log(`📊 Loaded usage stats: ${usageStats.totalRequests} total requests, ${Object.keys(usageStats.uniqueUsers).length} unique users`);
+    }
+  } catch (err) {
+    console.error('❌ Failed to load usage stats:', err.message);
+  }
+};
+
+// Save usage stats to disk
+const saveUsageStats = () => {
+  ensureLogDir();
+  try {
+    fs.writeFileSync(USAGE_STATS_FILE, JSON.stringify(usageStats, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Failed to save usage stats:', err.message);
+  }
+};
+
+// Save stats every 5 minutes
+setInterval(saveUsageStats, 5 * 60 * 1000);
+
+// Load stats on startup
+loadUsageStats();
+
+// ============================================================================
 // BASIC AUTH PROTECTION (optional - enabled when DASHBOARD_PASSWORD is set)
 // ============================================================================
 
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD;
 const DASHBOARD_USERNAME = process.env.DASHBOARD_USERNAME || 'ocmui'; // Default username
+
+// Store authenticated user on request for logging
+let currentAuthUser = null;
 
 if (DASHBOARD_PASSWORD) {
   console.log('🔐 Basic Auth protection ENABLED');
@@ -39,6 +143,7 @@ if (DASHBOARD_PASSWORD) {
     const [username, password] = credentials.split(':');
     
     if (username === DASHBOARD_USERNAME && password === DASHBOARD_PASSWORD) {
+      req.authUser = username; // Store for logging
       return next();
     }
     
@@ -48,6 +153,85 @@ if (DASHBOARD_PASSWORD) {
 } else {
   console.log('⚠️  Basic Auth protection DISABLED (no DASHBOARD_PASSWORD set)');
 }
+
+// ============================================================================
+// ACCESS LOGGING MIDDLEWARE
+// ============================================================================
+
+app.use((req, res, next) => {
+  // Skip health checks
+  if (req.path === '/health' || req.path === '/ready') {
+    return next();
+  }
+  
+  // Skip static file requests (JS, CSS, images, etc.) - only log page loads and API calls
+  const isStaticFile = /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map)$/i.test(req.path);
+  if (isStaticFile) {
+    return next();
+  }
+  
+  const startTime = Date.now();
+  const timestamp = new Date().toISOString();
+  const dateKey = timestamp.split('T')[0]; // "2026-02-09"
+  
+  // Try to identify the team member from X-Team-Member header (set by frontend)
+  const teamMember = req.headers['x-team-member'] || null;
+  const authUser = req.authUser || 'anonymous';
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+  
+  // Log on response finish
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    
+    const logEntry = {
+      timestamp,
+      method: req.method,
+      path: req.path,
+      query: Object.keys(req.query).length > 0 ? req.query : undefined,
+      statusCode: res.statusCode,
+      duration,
+      authUser,
+      teamMember,
+      ip,
+      userAgent: userAgent.substring(0, 150) // Truncate long UAs
+    };
+    
+    // Write to access log file
+    writeAccessLog(logEntry);
+    
+    // Update usage statistics
+    usageStats.totalRequests++;
+    
+    // Track endpoint hits
+    usageStats.endpointHits[req.path] = (usageStats.endpointHits[req.path] || 0) + 1;
+    
+    // Track unique users (by teamMember if available, otherwise authUser)
+    const userKey = teamMember || authUser;
+    if (!usageStats.uniqueUsers[userKey]) {
+      usageStats.uniqueUsers[userKey] = {
+        firstSeen: timestamp,
+        lastSeen: timestamp,
+        requestCount: 0,
+        teamMember: teamMember,
+        authUser: authUser
+      };
+    }
+    usageStats.uniqueUsers[userKey].lastSeen = timestamp;
+    usageStats.uniqueUsers[userKey].requestCount++;
+    
+    // Track daily activity
+    if (!usageStats.dailyActivity[dateKey]) {
+      usageStats.dailyActivity[dateKey] = { requests: 0, users: [] };
+    }
+    usageStats.dailyActivity[dateKey].requests++;
+    if (!usageStats.dailyActivity[dateKey].users.includes(userKey)) {
+      usageStats.dailyActivity[dateKey].users.push(userKey);
+    }
+  });
+  
+  next();
+});
 
 // Health check endpoints (no auth required)
 app.get('/health', (req, res) => res.send('OK'));
@@ -248,6 +432,257 @@ app.post('/api/team/members/reload', (req, res) => {
     }
   } catch (err) {
     res.status(500).json({ error: 'Failed to reload seed file', details: err.message });
+  }
+});
+
+// ============================================================================
+// ACCESS LOGGING & AUDIT API ENDPOINTS
+// ============================================================================
+
+// GET /api/audit/logs - Get recent access logs
+// Query params: 
+//   limit (default 100), offset (default 0)
+//   user (filter by user)
+//   date (filter by single date YYYY-MM-DD)
+//   startDate, endDate (filter by date range, ISO format or YYYY-MM-DD)
+//   path (filter by endpoint path)
+app.get('/api/audit/logs', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 100, 10000); // Max 10000 for reports
+  const offset = parseInt(req.query.offset) || 0;
+  const filterUser = req.query.user;
+  const filterDate = req.query.date;
+  const filterStartDate = req.query.startDate;
+  const filterEndDate = req.query.endDate;
+  const filterPath = req.query.path;
+  
+  try {
+    if (!fs.existsSync(ACCESS_LOG_FILE)) {
+      return res.json({
+        success: true,
+        logs: [],
+        total: 0,
+        message: 'No access logs yet'
+      });
+    }
+    
+    // Read log file (read recent entries efficiently)
+    const content = fs.readFileSync(ACCESS_LOG_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(Boolean);
+    
+    // Parse and filter logs
+    let logs = lines
+      .map(line => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .reverse(); // Most recent first
+    
+    // Apply filters
+    if (filterUser) {
+      logs = logs.filter(l => l.teamMember === filterUser || l.authUser === filterUser);
+    }
+    if (filterDate) {
+      logs = logs.filter(l => l.timestamp && l.timestamp.startsWith(filterDate));
+    }
+    // Date range filter
+    if (filterStartDate) {
+      const startDate = new Date(filterStartDate);
+      logs = logs.filter(l => l.timestamp && new Date(l.timestamp) >= startDate);
+    }
+    if (filterEndDate) {
+      const endDate = new Date(filterEndDate);
+      // If endDate is just a date (no time), include the whole day (use UTC to match ISO timestamps)
+      if (filterEndDate.length === 10) {
+        endDate.setUTCHours(23, 59, 59, 999);
+      }
+      logs = logs.filter(l => l.timestamp && new Date(l.timestamp) <= endDate);
+    }
+    if (filterPath) {
+      logs = logs.filter(l => l.path && l.path.includes(filterPath));
+    }
+    
+    const total = logs.length;
+    const paginatedLogs = logs.slice(offset, offset + limit);
+    
+    // Calculate date range of results
+    const timestamps = logs.map(l => l.timestamp).filter(Boolean).sort();
+    const oldestLog = timestamps[timestamps.length - 1];
+    const newestLog = timestamps[0];
+    
+    res.json({
+      success: true,
+      logs: paginatedLogs,
+      total,
+      offset,
+      limit,
+      hasMore: offset + limit < total,
+      dateRange: {
+        oldest: oldestLog,
+        newest: newestLog
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/audit/stats - Get usage statistics
+app.get('/api/audit/stats', (req, res) => {
+  // Match users to team members
+  const usersWithTeamInfo = Object.entries(usageStats.uniqueUsers).map(([key, data]) => {
+    const teamMember = membersCache.find(m => 
+      m.name === key || 
+      m.jira === key || 
+      m.github === key ||
+      m.name === data.teamMember
+    );
+    
+    return {
+      identifier: key,
+      ...data,
+      teamMemberMatch: teamMember ? teamMember.name : null,
+      isTeamMember: !!teamMember
+    };
+  });
+  
+  // Sort by most recent activity
+  usersWithTeamInfo.sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
+  
+  // Get last 30 days of daily activity
+  const last30Days = Object.entries(usageStats.dailyActivity)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 30)
+    .map(([date, data]) => ({ date, ...data }));
+  
+  // Top endpoints
+  const topEndpoints = Object.entries(usageStats.endpointHits)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([path, count]) => ({ path, count }));
+  
+  res.json({
+    success: true,
+    summary: {
+      totalRequests: usageStats.totalRequests,
+      uniqueUsers: Object.keys(usageStats.uniqueUsers).length,
+      teamMembersActive: usersWithTeamInfo.filter(u => u.isTeamMember).length,
+      serverStartTime: usageStats.serverStartTime,
+      logFile: ACCESS_LOG_FILE,
+      logFileExists: fs.existsSync(ACCESS_LOG_FILE),
+      logFileSize: fs.existsSync(ACCESS_LOG_FILE) 
+        ? `${(fs.statSync(ACCESS_LOG_FILE).size / 1024).toFixed(1)} KB` 
+        : '0 KB'
+    },
+    users: usersWithTeamInfo,
+    dailyActivity: last30Days,
+    topEndpoints
+  });
+});
+
+// GET /api/audit/users - Get dashboard users (who's using the dashboard)
+app.get('/api/audit/users', (req, res) => {
+  // Match usage data with team roster
+  const users = Object.entries(usageStats.uniqueUsers).map(([key, data]) => {
+    const teamMember = membersCache.find(m => 
+      m.name === key || 
+      m.jira === key || 
+      m.github === key ||
+      m.name === data.teamMember
+    );
+    
+    return {
+      identifier: key,
+      name: teamMember?.name || data.teamMember || key,
+      role: teamMember?.role || 'unknown',
+      firstSeen: data.firstSeen,
+      lastSeen: data.lastSeen,
+      requestCount: data.requestCount,
+      isTeamMember: !!teamMember
+    };
+  });
+  
+  // Sort by most active
+  users.sort((a, b) => b.requestCount - a.requestCount);
+  
+  res.json({
+    success: true,
+    users,
+    totalUsers: users.length,
+    teamMembers: users.filter(u => u.isTeamMember).length,
+    externalUsers: users.filter(u => !u.isTeamMember).length
+  });
+});
+
+// POST /api/audit/identify - Frontend calls this to identify the current user
+// Body: { teamMember: "Dave Taylor" }
+app.post('/api/audit/identify', (req, res) => {
+  const { teamMember } = req.body;
+  
+  if (!teamMember) {
+    return res.status(400).json({ error: 'teamMember is required' });
+  }
+  
+  // Log this identification
+  const timestamp = new Date().toISOString();
+  writeAccessLog({
+    timestamp,
+    type: 'user_identification',
+    teamMember,
+    ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown',
+    userAgent: (req.headers['user-agent'] || 'unknown').substring(0, 150)
+  });
+  
+  res.json({ success: true, message: `Identified as ${teamMember}` });
+});
+
+// DELETE /api/audit/logs - Clear old logs (admin action)
+// Query params: before (ISO date string - delete logs before this date)
+app.delete('/api/audit/logs', (req, res) => {
+  const beforeDate = req.query.before;
+  
+  if (!beforeDate) {
+    return res.status(400).json({ error: 'before query param required (ISO date string)' });
+  }
+  
+  try {
+    if (!fs.existsSync(ACCESS_LOG_FILE)) {
+      return res.json({ success: true, deleted: 0, message: 'No logs to delete' });
+    }
+    
+    const content = fs.readFileSync(ACCESS_LOG_FILE, 'utf8');
+    const lines = content.trim().split('\n').filter(Boolean);
+    
+    const cutoffDate = new Date(beforeDate);
+    let deletedCount = 0;
+    
+    const remainingLogs = lines.filter(line => {
+      try {
+        const log = JSON.parse(line);
+        const logDate = new Date(log.timestamp);
+        if (logDate < cutoffDate) {
+          deletedCount++;
+          return false;
+        }
+        return true;
+      } catch {
+        return true; // Keep malformed lines
+      }
+    });
+    
+    fs.writeFileSync(ACCESS_LOG_FILE, remainingLogs.join('\n') + '\n', 'utf8');
+    
+    res.json({
+      success: true,
+      deleted: deletedCount,
+      remaining: remainingLogs.length,
+      message: `Deleted ${deletedCount} log entries before ${beforeDate}`
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

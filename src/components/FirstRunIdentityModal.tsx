@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSettings } from '../contexts/SettingsContext';
+import { auditFetch, identifyUser } from '../utils/auditFetch';
 
 interface TeamMember {
   name: string;
@@ -35,7 +36,7 @@ const FirstRunIdentityModal: React.FC<FirstRunIdentityModalProps> = ({ isOpen, o
     setLoading(true);
     try {
       // Try server API first (Phase 4 - shared roster)
-      const apiResponse = await fetch('/api/team/members');
+      const apiResponse = await auditFetch('/api/team/members');
       if (apiResponse.ok) {
         const data = await apiResponse.json();
         if (data.success && Array.isArray(data.members)) {
@@ -100,7 +101,7 @@ const FirstRunIdentityModal: React.FC<FirstRunIdentityModalProps> = ({ isOpen, o
     setIsAddingNew(false);
   };
 
-  const handleConfirmSelection = () => {
+  const handleConfirmSelection = async () => {
     if (!selectedMember) return;
 
     // Set timezone
@@ -125,6 +126,9 @@ const FirstRunIdentityModal: React.FC<FirstRunIdentityModalProps> = ({ isOpen, o
       }
       saveSettings(updatedTokens);
     }
+
+    // Log the user identification for audit trail
+    await identifyUser(selectedMember.name);
 
     console.log(`✅ First-run identity set: ${selectedMember.name}`);
     onComplete();
@@ -159,7 +163,7 @@ const FirstRunIdentityModal: React.FC<FirstRunIdentityModalProps> = ({ isOpen, o
 
     // Try server API first (Phase 4)
     try {
-      const response = await fetch('/api/team/members', {
+      const response = await auditFetch('/api/team/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(trimmedMember)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSettings } from '../contexts/SettingsContext';
+import { auditFetch } from '../utils/auditFetch';
 
 // Query keys for different data types
 export const queryKeys = {
@@ -105,9 +106,9 @@ interface MyPRsResponse {
 //   comments: GitHubComment[];
 // }
 
-// API fetch functions
+// API fetch functions (using auditFetch for access logging)
 const fetchSprintJiras = async (jiraUsername: string, jiraToken: string): Promise<SprintJirasResponse> => {
-  const response = await fetch('/api/jira-sprint-tickets', {
+  const response = await auditFetch('/api/jira-sprint-tickets', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -126,7 +127,7 @@ const fetchSprintJiras = async (jiraUsername: string, jiraToken: string): Promis
 };
 
 const fetchJiraTicket = async (jiraId: string, jiraToken: string) => {
-  const response = await fetch('/api/jira-ticket', {
+  const response = await auditFetch('/api/jira-ticket', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -146,7 +147,7 @@ const fetchJiraTicket = async (jiraId: string, jiraToken: string) => {
 
 // Fetch child issues for an epic/feature/parent
 const fetchJiraChildIssues = async (parentKey: string, jiraToken: string) => {
-  const response = await fetch('/api/jira-child-issues', {
+  const response = await auditFetch('/api/jira-child-issues', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parentKey, token: jiraToken })
@@ -180,8 +181,8 @@ const filterPRsForReviewerRole = async (prs: GitHubPR[], githubUsername: string)
       
       // Fetch PR details and reviews via server-side proxy
       const [prResponse, reviewsResponse] = await Promise.all([
-        fetch(`/api/github/repos/${owner}/${repo}/pulls/${pr.number}`),
-        fetch(`/api/github/repos/${owner}/${repo}/pulls/${pr.number}/reviews`)
+        auditFetch(`/api/github/repos/${owner}/${repo}/pulls/${pr.number}`),
+        auditFetch(`/api/github/repos/${owner}/${repo}/pulls/${pr.number}/reviews`)
       ]);
       
       if (!prResponse.ok || !reviewsResponse.ok) {
@@ -218,7 +219,7 @@ const fetchMyCodeReviews = async (githubUsername: string): Promise<CodeReviewsRe
   
   // Use broader search to find PRs involving the user, then filter for reviewer role
   const query = `is:pr is:open involves:${githubUsername}`;
-  const response = await fetch(`/api/github/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100`);
+  const response = await auditFetch(`/api/github/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100`);
 
   if (!response.ok) {
     if (response.status === 503) {
@@ -262,7 +263,7 @@ const fetchMyPRs = async (githubUsername: string, status: 'open' | 'closed', pag
   
   // GitHub search for user's own PRs via server proxy
   const query = `is:pr author:${githubUsername} is:${status}`;
-  const response = await fetch(`/api/github/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`);
+  const response = await auditFetch(`/api/github/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=${perPage}&page=${page}`);
 
   if (!response.ok) {
     if (response.status === 503) {
@@ -588,7 +589,7 @@ const fetchPRDetails = async (
       const headSha: string | undefined = prDetails?.head?.sha;
       if (headSha) {
         const statusUrl = `/api/github/repos/${owner}/${repo}/commits/${headSha}/status`;
-        const statusResp = await fetch(statusUrl);
+        const statusResp = await auditFetch(statusUrl);
         if (statusResp.ok) {
           const statusData = await statusResp.json();
           const state = String(statusData?.state || '').toLowerCase();
@@ -1017,7 +1018,7 @@ interface EpicsResponse {
 
 // Fetch epics from JIRA
 const fetchEpics = async (filter: 'in-progress' | 'planning' | 'all' | 'blocked'): Promise<EpicsResponse> => {
-  const response = await fetch('/api/jira-epics', {
+  const response = await auditFetch('/api/jira-epics', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1078,7 +1079,7 @@ interface UpdateJiraFieldParams {
 }
 
 const updateJiraField = async ({ issueKey, fieldId, value }: UpdateJiraFieldParams): Promise<{ success: boolean }> => {
-  const response = await fetch('/api/jira-update-field', {
+  const response = await auditFetch('/api/jira-update-field', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ issueKey, fieldId, value }),
@@ -1128,7 +1129,7 @@ interface ReviewerWorkloadResponse {
 
 // Fetch reviewer workload from server
 const fetchReviewerWorkload = async (): Promise<ReviewerWorkloadResponse> => {
-  const response = await fetch('/api/github/reviewer-workload');
+  const response = await auditFetch('/api/github/reviewer-workload');
 
   if (!response.ok) {
     if (response.status === 503) {
@@ -1162,7 +1163,7 @@ const fetchPRByNumber = async (prNumber: number, currentUser: string): Promise<a
   const repo = 'uhc-portal';
   
   // Fetch the PR details
-  const prResponse = await fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}`);
+  const prResponse = await auditFetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}`);
   
   if (!prResponse.ok) {
     if (prResponse.status === 404) {

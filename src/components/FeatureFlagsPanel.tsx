@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { auditFetch } from '../utils/auditFetch';
 
 interface FeatureFlag {
   name: string;
@@ -47,7 +48,7 @@ const FeatureFlagsPanel: React.FC = () => {
     
     try {
       // First check if Unleash is configured
-      const statusRes = await fetch('/api/unleash/status');
+      const statusRes = await auditFetch('/api/unleash/status');
       const statusData = await statusRes.json();
       
       if (!statusData.configured) {
@@ -60,7 +61,7 @@ const FeatureFlagsPanel: React.FC = () => {
       setConfigured(true);
       
       // Fetch flags
-      const res = await fetch('/api/unleash/flags');
+      const res = await auditFetch('/api/unleash/flags');
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error || `HTTP ${res.status}`);

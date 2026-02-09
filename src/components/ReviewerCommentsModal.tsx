@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useSettings } from '../contexts/SettingsContext';
 import { parseGitHubMarkdownWithCaching } from '../utils/formatting';
+import { auditFetch } from '../utils/auditFetch';
 
 interface ReviewerComment {
   body: string;
@@ -43,9 +44,9 @@ const ReviewerCommentsModal: React.FC<ReviewerCommentsModalProps> = ({
         // Fetch via server proxy (no token needed - server provides it)
         const [owner, repo] = repoName.split('/');
         const [reviewsResponse, commentsResponse, reviewCommentsResponse] = await Promise.all([
-          fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/reviews`),
-          fetch(`/api/github/repos/${owner}/${repo}/issues/${prNumber}/comments`),
-          fetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/comments`) // Inline review comments
+          auditFetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/reviews`),
+          auditFetch(`/api/github/repos/${owner}/${repo}/issues/${prNumber}/comments`),
+          auditFetch(`/api/github/repos/${owner}/${repo}/pulls/${prNumber}/comments`) // Inline review comments
         ]);
 
         if (!reviewsResponse.ok || !commentsResponse.ok || !reviewCommentsResponse.ok) {
