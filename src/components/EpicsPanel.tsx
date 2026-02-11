@@ -564,12 +564,14 @@ const EpicsPanel: React.FC = () => {
     return epics;
   }, [data?.epics, sortField, sortDirection, statusFilter]);
 
-  // Compute status counts for the current filtered view (before status filter, must be before early returns)
+  // Compute status counts for the current filtered view (before status filter, must be before early returns).
+  // Exclude Closed so we don't show a Closed filter button (we don't care about blocked closed tickets).
   const statusCounts = useMemo(() => {
     if (!data?.epics) return [];
     const counts: Record<string, number> = {};
     data.epics.forEach(epic => {
       const status = epic.status || 'Unknown';
+      if (status === 'Closed') return;
       counts[status] = (counts[status] || 0) + 1;
     });
     // Sort by count descending
@@ -577,6 +579,11 @@ const EpicsPanel: React.FC = () => {
       .sort((a, b) => b[1] - a[1])
       .map(([status, count]) => ({ status, count }));
   }, [data?.epics]);
+
+  // Clear status filter if it was Closed (we no longer show the Closed filter button)
+  useEffect(() => {
+    if (statusFilter === 'Closed') setStatusFilter(null);
+  }, [statusFilter]);
 
   // Handle sort click
   const handleSort = (field: SortField) => {
@@ -748,14 +755,13 @@ const EpicsPanel: React.FC = () => {
         </button>
       </div>
 
-      {/* Status summary badges - clickable filters */}
+      {/* Status summary badges - clickable filters. Inactive = gray, active = magenta. */}
       {statusCounts.length > 0 && (
         <div className="epics-status-summary">
           {statusCounts.map(({ status, count }) => (
             <button 
               key={status} 
               className={`epics-status-count-badge ${statusFilter === status ? 'active' : ''}`}
-              style={{ backgroundColor: getStatusColor(status) }}
               onClick={() => setStatusFilter(statusFilter === status ? null : status)}
               title={statusFilter === status ? 'Clear filter' : `Filter by ${status}`}
             >

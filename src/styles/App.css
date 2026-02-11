@@ -5549,9 +5549,9 @@ body.dark-theme .github-image-fallback:hover {
 }
 
 .epics-filter-btn.active {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: #8b5cf6;
-  color: #c4b5fd;
+  background: rgba(217, 70, 239, 0.2);
+  border-color: #d946ef;
+  color: #f5d0fe;
 }
 
 /* Status summary badges */
@@ -5570,21 +5570,22 @@ body.dark-theme .github-image-fallback:hover {
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  background: #4b5563;
+  color: #e5e7eb;
   border: 2px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .epics-status-count-badge:hover {
-  filter: brightness(1.15);
+  background: #6b7280;
   transform: translateY(-1px);
 }
 
 .epics-status-count-badge.active {
-  border-color: #fff;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+  background: #d946ef;
+  color: #fff;
+  border-color: #f5d0fe;
 }
 
 /* Table container */

@@ -1866,8 +1866,8 @@ app.post('/api/jira-epics', async (req, res) => {
                 jql = `project = OCMUI AND issuetype = Epic AND Blocked = "False" AND (status != Closed OR resolved >= -90d) ORDER BY "Target end" ASC`;
                 break;
             case 'blocked':
-                // Blocked OCMUI epics (no label filter - show all blocked)
-                jql = `project = OCMUI AND issuetype = Epic AND Blocked = "True" ORDER BY "Target end" ASC`;
+                // Blocked OCMUI epics (exclude Closed - we don't care about blocked closed items)
+                jql = `project = OCMUI AND issuetype = Epic AND Blocked = "True" AND status != Closed ORDER BY "Target end" ASC`;
                 break;
             case 'planning':
                 // Planning OCMUI epics (ui-active-item label, unblocked, status = New/Refinement/Backlog/To Do)
