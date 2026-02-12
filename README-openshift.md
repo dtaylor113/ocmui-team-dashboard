@@ -114,17 +114,27 @@ oc get secret ocmui-dashboard-tokens -o yaml
 
 ### Update Tokens
 
+**Update only Unleash tokens** (keeps GitHub and JIRA unchanged):
+
 ```bash
-# Delete and recreate the secret
+oc patch secret ocmui-dashboard-tokens -p '{"stringData":{
+  "unleash-staging-token":"YOUR_STAGING_TOKEN",
+  "unleash-prod-token":"YOUR_PROD_TOKEN"
+}}'
+oc rollout restart deployment/ocmui-team-dashboard
+```
+
+**Replace entire secret** (use when rotating GitHub, JIRA, or all tokens):
+
+```bash
 oc delete secret ocmui-dashboard-tokens
 
 oc create secret generic ocmui-dashboard-tokens \
   --from-literal=github-token='ghp_xxxxxxxxxxxxxxxxxxxx' \
   --from-literal=jira-token='your-jira-personal-access-token' \
-  --from-literal=unleash-staging-token='user:xxxxxxxxx' \
-  --from-literal=unleash-prod-token='user:xxxxxxxxx'
+  --from-literal=unleash-staging-token='your-staging-token' \
+  --from-literal=unleash-prod-token='your-prod-token'
 
-# Restart deployment to pick up new tokens
 oc rollout restart deployment/ocmui-team-dashboard
 ```
 
@@ -134,8 +144,25 @@ oc rollout restart deployment/ocmui-team-dashboard
 |-------|---------|---------------|
 | `github-token` | GitHub API access | GitHub Settings → Developer settings → Personal access tokens |
 | `jira-token` | JIRA API access | issues.redhat.com → Profile → Personal Access Tokens |
-| `unleash-staging-token` | Unleash staging API | ocm-stage.unleash.devshift.net → Admin → API Access |
-| `unleash-prod-token` | Unleash production API | ocm.unleash.devshift.net → Admin → API Access |
+| `unleash-staging-token` | Unleash staging API | [Unleash token](#unleash-feature-flag-token-server-side-client) (Server-side SDK CLIENT, read-only) |
+| `unleash-prod-token` | Unleash production API | Same; create one token per environment (staging + production) |
+
+### Unleash feature flag token (Server-side CLIENT)
+
+The dashboard only **reads** feature flags from Unleash. Use a **Server-side SDK (CLIENT)** token — not an Admin token.
+
+**Privileges:** A CLIENT token is **read-only** for configuration. It can fetch feature toggle configurations and post usage metrics only. It **cannot** create, update, or delete feature flags or any other Unleash resources. Only an **ADMIN** token has full access.
+
+**How to create (with Red Hat SSO):** You create the token while logged in as Admin; no separate Viewer user or login is needed.
+
+1. In Unleash go to **Admin → API access → Create API token**.
+2. **Token name**: e.g. `ocmui-team-dashboard-viewer`.
+3. **What do you want to connect?** Choose **Server-side SDK (CLIENT)** (not Client-side FRONTEND, not ADMIN).
+4. **Project**: e.g. all projects or the project the dashboard uses (e.g. `default`).
+5. **Environment**: `production` for prod; create a second token with environment `development` (or your staging env) for staging.
+6. Create the token and copy it (format like `*:production.xxxx` or `*:development.xxxx`).
+7. Repeat on the other Unleash instance if you use both (e.g. ocm.unleash.devshift.net and ocm-stage.unleash.devshift.net).
+8. Store the tokens in the cluster using [Update only Unleash tokens](#update-tokens) above (`oc patch secret ...` then `oc rollout restart`).
 
 ### Verify Token Status
 
