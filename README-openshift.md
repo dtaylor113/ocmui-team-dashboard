@@ -144,25 +144,25 @@ oc rollout restart deployment/ocmui-team-dashboard
 |-------|---------|---------------|
 | `github-token` | GitHub API access | GitHub Settings → Developer settings → Personal access tokens |
 | `jira-token` | JIRA API access | issues.redhat.com → Profile → Personal Access Tokens |
-| `unleash-staging-token` | Unleash staging API | [Unleash token](#unleash-feature-flag-token-server-side-client) (Server-side SDK CLIENT, read-only) |
-| `unleash-prod-token` | Unleash production API | Same; create one token per environment (staging + production) |
+| `unleash-staging-token` | Unleash staging (Feature Flags tab) | [Unleash token](#unleash-feature-flag-token-server-side-client) — **Server-side SDK (CLIENT)** / Backend token only |
+| `unleash-prod-token` | Unleash production (Feature Flags tab) | Same; one token per environment |
 
 ### Unleash feature flag token (Server-side CLIENT)
 
-The dashboard only **reads** feature flags from Unleash. Use a **Server-side SDK (CLIENT)** token — not an Admin token.
+The Feature Flags tab uses Unleash’s **Client API** (`GET /api/client/features`) only, so **Server-side SDK (CLIENT)** / Backend tokens work. No Admin API or personal access tokens are required.
 
-**Privileges:** A CLIENT token is **read-only** for configuration. It can fetch feature toggle configurations and post usage metrics only. It **cannot** create, update, or delete feature flags or any other Unleash resources. Only an **ADMIN** token has full access.
+**Privileges:** A CLIENT token is read-only (fetch feature configurations; no create/update/delete).
 
-**How to create (with Red Hat SSO):** You create the token while logged in as Admin; no separate Viewer user or login is needed.
+**How to create (with Red Hat SSO):** Create the token while logged in as Admin.
 
 1. In Unleash go to **Admin → API access → Create API token**.
 2. **Token name**: e.g. `ocmui-team-dashboard-viewer`.
-3. **What do you want to connect?** Choose **Server-side SDK (CLIENT)** (not Client-side FRONTEND, not ADMIN).
-4. **Project**: e.g. all projects or the project the dashboard uses (e.g. `default`).
-5. **Environment**: `production` for prod; create a second token with environment `development` (or your staging env) for staging.
-6. Create the token and copy it (format like `*:production.xxxx` or `*:development.xxxx`).
+3. **What do you want to connect?** Choose **Server-side SDK (CLIENT)**.
+4. **Project**: all projects or the project the dashboard uses (e.g. `default`).
+5. **Environment**: `production` for prod; create a second token with environment `development` (or staging) for staging.
+6. Create the token and copy it. Use the value **as shown** — format is `*:environment.hash` (e.g. `*:production.xxxx`). Do **not** add a `user:` prefix (that is for personal access tokens only).
 7. Repeat on the other Unleash instance if you use both (e.g. ocm.unleash.devshift.net and ocm-stage.unleash.devshift.net).
-8. Store the tokens in the cluster using [Update only Unleash tokens](#update-tokens) above (`oc patch secret ...` then `oc rollout restart`).
+8. Store the tokens with [Update only Unleash tokens](#update-tokens) above (`oc patch secret ...` then `oc rollout restart`).
 
 ### Verify Token Status
 

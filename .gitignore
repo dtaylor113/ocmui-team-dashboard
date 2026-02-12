@@ -1,5 +1,6 @@
 # macOS Finder metadata
 .DS_Store
+.env
 node_modules
 dist/
 images/

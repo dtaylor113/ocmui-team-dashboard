@@ -1,3 +1,4 @@
+import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
 import https from 'https';
@@ -6,6 +7,9 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Load .env from project root (so it works regardless of cwd when running node server/index.js)
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+
 const app = express();
 const PORT = process.env.PORT || 3017;
 
@@ -121,7 +125,7 @@ const DASHBOARD_USERNAME = process.env.DASHBOARD_USERNAME || 'ocmui'; // Default
 let currentAuthUser = null;
 
 if (DASHBOARD_PASSWORD) {
-  console.log('🔐 Basic Auth protection ENABLED');
+  console.log('🔐 Basic Auth protection ENABLED — API requests need Authorization header; if you get 401 locally, unset DASHBOARD_PASSWORD in .env');
   
   // HTTP Basic Auth middleware
   app.use((req, res, next) => {
@@ -153,6 +157,13 @@ if (DASHBOARD_PASSWORD) {
 } else {
   console.log('⚠️  Basic Auth protection DISABLED (no DASHBOARD_PASSWORD set)');
 }
+
+// Log whether tokens are loaded (values never printed)
+console.log('🔑 Env: GITHUB_TOKEN=%s JIRA_TOKEN=%s UNLEASH_STAGING=%s UNLEASH_PROD=%s',
+  process.env.GITHUB_TOKEN ? 'set' : 'NOT SET',
+  process.env.JIRA_TOKEN ? 'set' : 'NOT SET',
+  process.env.UNLEASH_STAGING_TOKEN ? 'set' : 'NOT SET',
+  process.env.UNLEASH_PROD_TOKEN ? 'set' : 'NOT SET');
 
 // ============================================================================
 // ACCESS LOGGING MIDDLEWARE
@@ -2125,7 +2136,10 @@ const fetchFeatureConstants = async () => {
 };
 
 // Helper function to make Unleash API requests
+// Devshift / some Unleash instances expect "Bearer <token>" in Authorization header
 const makeUnleashRequest = (baseUrl, token, endpoint) => {
+    const rawToken = (token || '').trim();
+    const authHeader = rawToken ? (rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`) : '';
     return new Promise((resolve, reject) => {
         const url = new URL(`/api${endpoint}`, baseUrl);
         const options = {
@@ -2133,7 +2147,7 @@ const makeUnleashRequest = (baseUrl, token, endpoint) => {
             path: url.pathname + url.search,
             method: 'GET',
             headers: {
-                'Authorization': token,
+                'Authorization': authHeader,
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             }
@@ -2223,8 +2237,12 @@ const formatUser = (email) => {
     return match ? match[1] : email;
 };
 
+// Unleash API disabled by default (tab hidden; set ENABLE_UNLEASH_API=true to enable when token auth is resolved)
+const ENABLE_UNLEASH_API = process.env.ENABLE_UNLEASH_API === 'true';
+
 // Unleash status endpoint - check if tokens are configured
 app.get('/api/unleash/status', async (req, res) => {
+    if (!ENABLE_UNLEASH_API) return res.status(404).json({ error: 'Unleash API disabled' });
     // Also fetch the current list of codebase flags to show in status
     const codebaseFlags = await fetchFeatureConstants();
     res.json({
@@ -2245,6 +2263,7 @@ app.get('/api/unleash/status', async (req, res) => {
 
 // Get all feature flags comparison between staging and production
 app.get('/api/unleash/flags', async (req, res) => {
+    if (!ENABLE_UNLEASH_API) return res.status(404).json({ error: 'Unleash API disabled' });
     if (!UNLEASH_STAGING_TOKEN || !UNLEASH_PROD_TOKEN) {
         return res.status(503).json({ 
             error: 'Unleash tokens not configured on server',
@@ -2258,35 +2277,40 @@ app.get('/api/unleash/flags', async (req, res) => {
     const { showAll = 'false' } = req.query;
     
     try {
-        console.log('🔄 Fetching feature flags from staging and production...');
-        
-        // Fetch the list of flags used in the OCMUI codebase AND features from both environments
+        console.log('🔄 Fetching feature flags from staging and production (Client API)...');
+
+        // Client API: GET /api/client/features — works with Server-side SDK (CLIENT) / Backend tokens; no Admin API
         const [codebaseFlags, stagingResult, prodResult] = await Promise.all([
             fetchFeatureConstants(),
-            makeUnleashRequest(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, `/admin/projects/${UNLEASH_PROJECT}/features`),
-            makeUnleashRequest(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, `/admin/projects/${UNLEASH_PROJECT}/features`)
+            makeUnleashRequest(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, '/client/features'),
+            makeUnleashRequest(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, '/client/features')
         ]);
-        
+
         if (stagingResult.statusCode !== 200) {
-            return res.status(stagingResult.statusCode).json({ 
-                error: 'Failed to fetch staging features', 
-                details: stagingResult.data 
+            if (stagingResult.statusCode === 401) {
+                console.warn('🟪 Unleash staging 401 — response:', JSON.stringify(stagingResult.data));
+                console.warn('🟪 Token format: use the value exactly as shown in Unleash (e.g. *:development.xxxx). No "user:" prefix. If token was copied from a different instance or env, recreate it for ocm-stage.unleash.devshift.net / development.');
+            }
+            return res.status(stagingResult.statusCode).json({
+                error: 'Failed to fetch staging features',
+                details: stagingResult.data
             });
         }
-        
+
         if (prodResult.statusCode !== 200) {
-            return res.status(prodResult.statusCode).json({ 
-                error: 'Failed to fetch production features', 
-                details: prodResult.data 
+            console.warn(`🟪 Unleash production returned ${prodResult.statusCode}`, prodResult.statusCode === 401 ? '(check token format)' : '');
+            return res.status(prodResult.statusCode).json({
+                error: 'Failed to fetch production features',
+                details: prodResult.data
             });
         }
-        
-        const stagingFeatures = (stagingResult.data.features || []).filter(f => !f.archived);
-        const prodFeatures = (prodResult.data.features || []).filter(f => !f.archived);
-        
-        // Create maps
-        const stagingMap = new Map(stagingFeatures.map(f => [f.name, f]));
-        const prodMap = new Map(prodFeatures.map(f => [f.name, f]));
+
+        // Client API returns { features: [...] } or { toggles: [...] }; each item has name, enabled, strategies
+        const stagingList = stagingResult.data.features ?? stagingResult.data.toggles ?? [];
+        const prodList = prodResult.data.features ?? prodResult.data.toggles ?? [];
+
+        const stagingMap = new Map(stagingList.map(f => [f.name, f]));
+        const prodMap = new Map(prodList.map(f => [f.name, f]));
         
         // Combine all flag names from Unleash
         const allUnleashNames = new Set([...stagingMap.keys(), ...prodMap.keys()]);
@@ -2308,133 +2332,30 @@ app.get('/api/unleash/flags', async (req, res) => {
             console.log(`📊 Filtered to ${filteredNames.length} flags with '${FLAG_PREFIX}' prefix or in codebase`);
         }
         
-        // Build comparison data - fetch full details for each flag
+        // Build comparison from Client API data (each feature already has enabled + strategies; no per-flag or events calls)
         const flagsData = [];
-        
+
         for (const name of filteredNames) {
             const stagingFeature = stagingMap.get(name);
             const prodFeature = prodMap.get(name);
-            
-            // Get full feature details to get environment status and strategies
-            let stagingStatus = null;
-            let prodStatus = null;
-            let prodModifiedInfo = null;
-            
-            if (stagingFeature) {
-                try {
-                    const fullFeature = await makeUnleashRequest(
-                        UNLEASH_STAGING_URL, 
-                        UNLEASH_STAGING_TOKEN, 
-                        `/admin/projects/${UNLEASH_PROJECT}/features/${name}`
-                    );
-                    if (fullFeature.statusCode === 200) {
-                        const env = fullFeature.data.environments?.find(e => e.name === 'default') || fullFeature.data.environments?.[0];
-                        stagingStatus = {
-                            enabled: env?.enabled ?? false,
-                            strategies: env?.strategies || []
-                        };
-                    }
-                } catch (e) {
-                    console.error(`Error fetching staging details for ${name}:`, e.message);
-                }
-            }
-            
-            if (prodFeature) {
-                try {
-                    const fullFeature = await makeUnleashRequest(
-                        UNLEASH_PROD_URL, 
-                        UNLEASH_PROD_TOKEN, 
-                        `/admin/projects/${UNLEASH_PROJECT}/features/${name}`
-                    );
-                    if (fullFeature.statusCode === 200) {
-                        const env = fullFeature.data.environments?.find(e => e.name === 'default') || fullFeature.data.environments?.[0];
-                        prodStatus = {
-                            enabled: env?.enabled ?? false,
-                            strategies: env?.strategies || []
-                        };
-                    }
-                    
-                    // Get events for last modified info
-                    const eventsResult = await makeUnleashRequest(
-                        UNLEASH_PROD_URL,
-                        UNLEASH_PROD_TOKEN,
-                        `/admin/events/${encodeURIComponent(name)}`
-                    );
-                    
-                    if (eventsResult.statusCode === 200 && eventsResult.data.events) {
-                        const events = eventsResult.data.events.filter(e => e.featureName === name);
-                        events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                        
-                        const meaningfulTypes = [
-                            'feature-environment-enabled',
-                            'feature-environment-disabled', 
-                            'feature-strategy-add',
-                            'feature-strategy-update',
-                            'feature-strategy-remove',
-                            'feature-created',
-                        ];
-                        
-                        const lastMeaningful = events.find(e => meaningfulTypes.includes(e.type));
-                        if (lastMeaningful) {
-                            prodModifiedInfo = {
-                                date: lastMeaningful.createdAt,
-                                user: formatUser(lastMeaningful.createdBy),
-                                action: lastMeaningful.type.includes('enabled') ? 'enabled' :
-                                        lastMeaningful.type.includes('disabled') ? 'disabled' :
-                                        lastMeaningful.type === 'feature-created' ? 'created' : 'updated'
-                            };
-                        }
-                    }
-                } catch (e) {
-                    console.error(`Error fetching prod details for ${name}:`, e.message);
-                }
-            } else if (stagingFeature) {
-                // For staging-only flags, get events from staging
-                try {
-                    const eventsResult = await makeUnleashRequest(
-                        UNLEASH_STAGING_URL,
-                        UNLEASH_STAGING_TOKEN,
-                        `/admin/events/${encodeURIComponent(name)}`
-                    );
-                    
-                    if (eventsResult.statusCode === 200 && eventsResult.data.events) {
-                        const events = eventsResult.data.events.filter(e => e.featureName === name);
-                        events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                        
-                        const meaningfulTypes = [
-                            'feature-environment-enabled',
-                            'feature-environment-disabled', 
-                            'feature-strategy-add',
-                            'feature-strategy-update',
-                            'feature-strategy-remove',
-                            'feature-created',
-                        ];
-                        
-                        const lastMeaningful = events.find(e => meaningfulTypes.includes(e.type));
-                        if (lastMeaningful) {
-                            prodModifiedInfo = {
-                                date: lastMeaningful.createdAt,
-                                user: formatUser(lastMeaningful.createdBy),
-                                action: lastMeaningful.type.includes('enabled') ? 'enabled' :
-                                        lastMeaningful.type.includes('disabled') ? 'disabled' :
-                                        lastMeaningful.type === 'feature-created' ? 'created' : 'updated'
-                            };
-                        }
-                    }
-                } catch (e) {
-                    // Ignore event fetch errors
-                }
-            }
-            
+
+            const stagingStatus = stagingFeature
+                ? { enabled: stagingFeature.enabled ?? false, strategies: stagingFeature.strategies || [] }
+                : null;
+            const prodStatus = prodFeature
+                ? { enabled: prodFeature.enabled ?? false, strategies: prodFeature.strategies || [] }
+                : null;
+            // Modification history requires Admin API; with Client API only we leave null
+            const prodModifiedInfo = null;
+
             const staging = stagingStatus ? (stagingStatus.enabled ? 'ON' : 'OFF') : '-';
             const production = prodStatus ? (prodStatus.enabled ? 'ON' : 'OFF') : '-';
             const mismatch = staging !== '-' && production !== '-' && staging !== production;
-            
+
             const strategy = formatStrategySimple(prodStatus?.strategies || stagingStatus?.strategies);
-            
-            // Check if this flag is defined in the codebase
+
             const inCode = codebaseFlagsSet.has(name);
-            
+
             flagsData.push({
                 name,
                 inCode,

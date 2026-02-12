@@ -63,7 +63,7 @@ const FeatureFlagsPanel: React.FC = () => {
       // Fetch flags
       const res = await auditFetch('/api/unleash/flags');
       if (!res.ok) {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || `HTTP ${res.status}`);
       }
       

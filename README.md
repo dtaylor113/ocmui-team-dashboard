@@ -36,7 +36,7 @@ The header uses an **inline grouped navigation** with primary categories and the
 |-------------|----------------|-------------|
 | **🎫 JIRA** | My Sprint JIRAs, Epics | JIRA ticket management, team epics view |
 | **🐙 GitHub** | My Code Reviews, My PRs, Reviewers | GitHub PR tracking, team workload |
-| **••• Other** | 🚩 Feature Flags, 🔗 Doc Links | Unleash feature flags, URL health checker |
+| **••• Other** | 🔗 Doc Links | URL health checker (Feature Flags tab hidden; code preserved for future) |
 
 - **Quick Find bar** in header allows instant lookup of JIRA tickets or PRs by ID
 - Click a **primary tab** to switch categories and reveal its subtabs
@@ -52,7 +52,7 @@ The header uses an **inline grouped navigation** with primary categories and the
   - Reference Time input with 30‑minute steps (09:00–17:00) and TZ dropdown sortable alphabetically or by GMT offset
 - **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled "(edited)"
 - **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
-- **Feature Flags Dashboard**: Compare Unleash feature flags between staging and production; "In Code?" column; production modification history
+- **Feature Flags**: Code preserved but tab hidden (Unleash token auth issues with devshift). Server `/api/unleash/*` and `FeatureFlagsPanel.tsx` remain for when service-account or token auth is resolved.
 - **Doc Links Health Checker**: Validates 425 external documentation URLs from uhc-portal with real-time checks
 - **App Security Info**: Click "ⓘ App Security" in Settings to see how your data is protected
 
@@ -131,6 +131,10 @@ GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx UNLEASH_STAGING_TOKEN=user:xxxx UNLEASH_PR
 | `UNLEASH_STAGING_TOKEN` | Unleash staging API token (for Feature Flags tab) |
 | `UNLEASH_PROD_TOKEN` | Unleash production API token (for Feature Flags tab) |
 | `PORT` | Server port (default: 3017) |
+
+**Using a `.env` file:** Put these in a `.env` file in the project root and the server will load them automatically (no need to pass them in the terminal). Copy `.env.example` to `.env` and fill in your values. The `.env` file is gitignored so your tokens are not committed.
+
+**Feature Flags (tab hidden):** The Unleash API is **disabled by default** (`ENABLE_UNLEASH_API` is not set). The routes `/api/unleash/status` and `/api/unleash/flags` return 404 until you set `ENABLE_UNLEASH_API=true` (e.g. when token auth is fixed and the tab is re-enabled).
 
 ## 🚢 Deploying to OpenShift
 
