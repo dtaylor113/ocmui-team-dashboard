@@ -124,8 +124,10 @@ const DASHBOARD_USERNAME = process.env.DASHBOARD_USERNAME || 'ocmui'; // Default
 // Store authenticated user on request for logging
 let currentAuthUser = null;
 
-if (DASHBOARD_PASSWORD) {
-  console.log('🔐 Basic Auth protection ENABLED — API requests need Authorization header; if you get 401 locally, unset DASHBOARD_PASSWORD in .env');
+// Basic Auth only when explicitly enabled (e.g. for public deployment). Off by default for local.
+const ENABLE_BASIC_AUTH = process.env.ENABLE_BASIC_AUTH === 'true';
+if (ENABLE_BASIC_AUTH && DASHBOARD_PASSWORD) {
+  console.log('🔐 Basic Auth protection ENABLED — API requests need Authorization header');
   
   // HTTP Basic Auth middleware
   app.use((req, res, next) => {
@@ -155,7 +157,7 @@ if (DASHBOARD_PASSWORD) {
     return res.status(401).send('Invalid credentials');
   });
 } else {
-  console.log('⚠️  Basic Auth protection DISABLED (no DASHBOARD_PASSWORD set)');
+  console.log('⚠️  Basic Auth protection DISABLED (set ENABLE_BASIC_AUTH=true and DASHBOARD_PASSWORD to enable)');
 }
 
 // Log whether tokens are loaded (values never printed)
@@ -2071,9 +2073,11 @@ app.post('/api/jira-epics', async (req, res) => {
 // Server-side Unleash tokens (loaded from environment variables)
 const UNLEASH_STAGING_URL = process.env.UNLEASH_STAGING_URL || 'https://ocm-stage.unleash.devshift.net';
 const UNLEASH_PROD_URL = process.env.UNLEASH_PROD_URL || 'https://ocm.unleash.devshift.net';
-const UNLEASH_STAGING_TOKEN = process.env.UNLEASH_STAGING_TOKEN;
-const UNLEASH_PROD_TOKEN = process.env.UNLEASH_PROD_TOKEN;
+const UNLEASH_STAGING_TOKEN = (process.env.UNLEASH_STAGING_TOKEN || '').trim();
+const UNLEASH_PROD_TOKEN = (process.env.UNLEASH_PROD_TOKEN || '').trim();
 const UNLEASH_PROJECT = process.env.UNLEASH_PROJECT || 'default';
+const UNLEASH_STAGING_ENV = process.env.UNLEASH_STAGING_ENV || ''; // e.g. development (default: development, staging)
+const UNLEASH_PROD_ENV = process.env.UNLEASH_PROD_ENV || '';         // e.g. production (default: production, prod)
 
 // URL for the featureConstants.ts file that defines which flags are used in the OCMUI codebase
 const FEATURE_CONSTANTS_URL = process.env.FEATURE_CONSTANTS_URL || 
@@ -2135,11 +2139,16 @@ const fetchFeatureConstants = async () => {
     });
 };
 
+// Personal access tokens (user:xxx) work with Admin API only; backend tokens (*:env.hash) work with Client API.
+const isPersonalAccessToken = (token) => (token || '').trim().toLowerCase().startsWith('user:');
+
 // Helper function to make Unleash API requests
-// Devshift / some Unleash instances expect "Bearer <token>" in Authorization header
+// Personal tokens: Unleash docs use raw token (authorization: user:xxx). Backend tokens: some instances want Bearer.
+const UNLEASH_USE_BEARER = process.env.UNLEASH_USE_BEARER !== 'false';
 const makeUnleashRequest = (baseUrl, token, endpoint) => {
-    const rawToken = (token || '').trim();
-    const authHeader = rawToken ? (rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`) : '';
+    const rawToken = (token || '').trim().replace(/^Bearer\s+/i, '');
+    const useBearer = isPersonalAccessToken(rawToken) ? false : UNLEASH_USE_BEARER;
+    const authHeader = rawToken ? (useBearer ? `Bearer ${rawToken}` : rawToken) : '';
     return new Promise((resolve, reject) => {
         const url = new URL(`/api${endpoint}`, baseUrl);
         const options = {
@@ -2171,27 +2180,52 @@ const makeUnleashRequest = (baseUrl, token, endpoint) => {
     });
 };
 
+// Normalize strategy from Admin API (may use strategyName, parameters as array) or Client API
+const normalizeStrategy = (s) => {
+    if (!s || typeof s !== 'object') return null;
+    const name = s.name ?? s.strategyName ?? '';
+    let parameters = s.parameters;
+    if (Array.isArray(parameters)) {
+        const obj = {};
+        for (const p of parameters) {
+            if (p && (p.name !== undefined || p.parameterName !== undefined)) {
+                const k = p.name ?? p.parameterName;
+                obj[k] = p.value ?? p.parameterValue;
+            }
+        }
+        parameters = obj;
+    } else if (parameters == null || typeof parameters !== 'object') {
+        parameters = {};
+    }
+    return { name, constraints: s.constraints || [], parameters };
+};
+
 // Parse strategy to get human-readable info
 const parseStrategy = (strategy) => {
+    const norm = normalizeStrategy(strategy);
+    if (!norm) return { name: '', constraints: [], parameters: {} };
     const result = {
-        name: strategy.name,
-        constraints: strategy.constraints || [],
-        parameters: strategy.parameters || {},
+        name: norm.name,
+        constraints: norm.constraints || [],
+        parameters: norm.parameters || {},
     };
 
-    // Check for org-based constraints
+    // Check for org-based constraints (contextName or context; values or value)
     const orgConstraint = result.constraints.find(
-        c => c.contextName === 'orgId' || 
-             c.contextName === 'organizationId' ||
-             c.contextName === 'org_id'
+        c => {
+            const ctx = (c.contextName ?? c.context ?? '').toLowerCase();
+            return ctx === 'orgid' || ctx === 'organizationid' || ctx === 'org_id' || ctx === 'organization_id' || ctx.includes('org');
+        }
     );
 
     if (orgConstraint) {
-        result.orgIds = orgConstraint.values || [];
+        result.orgIds = orgConstraint.values ?? orgConstraint.value ?? [];
+        if (typeof result.orgIds === 'string') result.orgIds = result.orgIds.split(',').map(s => s.trim());
     }
 
     if (result.parameters.orgIds) {
-        result.orgIds = result.parameters.orgIds.split(',').map(s => s.trim());
+        const raw = result.parameters.orgIds;
+        result.orgIds = typeof raw === 'string' ? raw.split(',').map(s => s.trim()) : (Array.isArray(raw) ? raw : []);
     }
 
     return result;
@@ -2201,14 +2235,19 @@ const parseStrategy = (strategy) => {
 const formatStrategySimple = (strategies) => {
     if (!strategies || strategies.length === 0) return 'All';
     
+    // First pass: any strategy with org constraint (by name or constraints) → show perOrg / X orgs
     for (const s of strategies) {
         const parsed = parseStrategy(s);
         const name = parsed.name?.toLowerCase() || '';
-        
-        if (name === 'perorg' || name.includes('perorg')) {
+        const hasOrgConstraint = (parsed.orgIds && parsed.orgIds.length > 0) || name === 'perorg' || name.includes('perorg') || name === 'byorg' || name.includes('byorg');
+        if (hasOrgConstraint) {
             const orgCount = parsed.orgIds?.length || 0;
             return orgCount > 0 ? `${orgCount} orgs` : 'perOrg';
         }
+    }
+    for (const s of strategies) {
+        const parsed = parseStrategy(s);
+        const name = parsed.name?.toLowerCase() || '';
         
         if (name === 'excludeperorg' || name === 'excludebyorg' || name.includes('exclude')) {
             const orgCount = parsed.orgIds?.length || 0;
@@ -2237,16 +2276,18 @@ const formatUser = (email) => {
     return match ? match[1] : email;
 };
 
-// Unleash API disabled by default (tab hidden; set ENABLE_UNLEASH_API=true to enable when token auth is resolved)
-const ENABLE_UNLEASH_API = process.env.ENABLE_UNLEASH_API === 'true';
+// Unleash API enabled by default (for local use). Set ENABLE_UNLEASH_API=false to disable (e.g. when public route is on).
+const ENABLE_UNLEASH_API = process.env.ENABLE_UNLEASH_API !== 'false';
 
 // Unleash status endpoint - check if tokens are configured
 app.get('/api/unleash/status', async (req, res) => {
     if (!ENABLE_UNLEASH_API) return res.status(404).json({ error: 'Unleash API disabled' });
     // Also fetch the current list of codebase flags to show in status
     const codebaseFlags = await fetchFeatureConstants();
+    const bothPersonal = isPersonalAccessToken(UNLEASH_STAGING_TOKEN) && isPersonalAccessToken(UNLEASH_PROD_TOKEN);
     res.json({
         configured: !!(UNLEASH_STAGING_TOKEN && UNLEASH_PROD_TOKEN),
+        tokenType: bothPersonal ? 'personal' : 'backend',
         staging: {
             configured: !!UNLEASH_STAGING_TOKEN,
             url: UNLEASH_STAGING_URL
@@ -2275,48 +2316,130 @@ app.get('/api/unleash/flags', async (req, res) => {
     }
     
     const { showAll = 'false' } = req.query;
+    const useAdminApi = isPersonalAccessToken(UNLEASH_STAGING_TOKEN) && isPersonalAccessToken(UNLEASH_PROD_TOKEN);
+    const apiLabel = useAdminApi ? 'Admin API' : 'Client API';
     
     try {
-        console.log('🔄 Fetching feature flags from staging and production (Client API)...');
+        console.log(`🔄 Fetching feature flags from staging and production (${apiLabel})...`);
 
-        // Client API: GET /api/client/features — works with Server-side SDK (CLIENT) / Backend tokens; no Admin API
-        const [codebaseFlags, stagingResult, prodResult] = await Promise.all([
+        const adminPath = `/admin/projects/${UNLEASH_PROJECT}/features`;
+        const clientPath = '/client/features';
+        const stagingPath = useAdminApi ? adminPath : clientPath;
+        const prodPath = useAdminApi ? adminPath : clientPath;
+
+        const featuresPromise = Promise.all([
             fetchFeatureConstants(),
-            makeUnleashRequest(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, '/client/features'),
-            makeUnleashRequest(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, '/client/features')
+            makeUnleashRequest(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, stagingPath),
+            makeUnleashRequest(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, prodPath)
         ]);
+        const eventsPath = `/admin/events?project=${encodeURIComponent(UNLEASH_PROJECT)}`;
+        const eventsPromise = useAdminApi ? Promise.all([
+            makeUnleashRequest(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, eventsPath),
+            makeUnleashRequest(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, eventsPath)
+        ]).then(([stagingEventsRes, prodEventsRes]) => {
+            const toMap = (res) => {
+                const list = res.statusCode === 200 && res.data ? (Array.isArray(res.data) ? res.data : (res.data.events || [])) : [];
+                const byFeature = new Map();
+                const sorted = [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                for (const e of sorted) {
+                    const fn = e.featureName || e.feature;
+                    if (fn && !byFeature.has(fn)) byFeature.set(fn, { createdBy: e.createdBy, createdAt: e.createdAt });
+                }
+                return byFeature;
+            };
+            return { staging: toMap(stagingEventsRes), prod: toMap(prodEventsRes) };
+        }).catch(() => ({ staging: new Map(), prod: new Map() })) : Promise.resolve(null);
+
+        const [[codebaseFlags, stagingResult, prodResult], eventsByInstance] = await Promise.all([featuresPromise, eventsPromise]);
 
         if (stagingResult.statusCode !== 200) {
             if (stagingResult.statusCode === 401) {
-                console.warn('🟪 Unleash staging 401 — response:', JSON.stringify(stagingResult.data));
-                console.warn('🟪 Token format: use the value exactly as shown in Unleash (e.g. *:development.xxxx). No "user:" prefix. If token was copied from a different instance or env, recreate it for ocm-stage.unleash.devshift.net / development.');
+                const tokenLen = (UNLEASH_STAGING_TOKEN || '').length;
+                console.warn('🟪 Unleash staging 401 — URL:', UNLEASH_STAGING_URL + '/api' + stagingPath, '| token length:', tokenLen, '| auth:', UNLEASH_USE_BEARER ? 'Bearer' : 'raw', '|', useAdminApi ? 'Personal token → Admin API' : 'Backend token → Client API');
+                console.warn('🟪 Response:', JSON.stringify(stagingResult.data));
             }
+            const is401 = stagingResult.statusCode === 401;
+            const hint = useAdminApi
+                ? 'Personal tokens (user:xxx) use Admin API; ensure the token has read access to the project in Unleash.'
+                : 'Backend tokens (*:environment.xxx) use Client API. Re-copy token from Unleash if needed.';
             return res.status(stagingResult.statusCode).json({
-                error: 'Failed to fetch staging features',
+                error: is401 ? 'Unleash staging returned 401 (unauthorized)' : 'Failed to fetch staging features',
+                hint: is401 ? hint : undefined,
                 details: stagingResult.data
             });
         }
 
         if (prodResult.statusCode !== 200) {
-            console.warn(`🟪 Unleash production returned ${prodResult.statusCode}`, prodResult.statusCode === 401 ? '(check token format)' : '');
+            const is401 = prodResult.statusCode === 401;
+            if (is401) console.warn('🟪 Unleash production 401 —', useAdminApi ? 'check personal token and project access' : 'check UNLEASH_PROD_TOKEN');
+            else console.warn(`🟪 Unleash production returned ${prodResult.statusCode}`);
+            const hint = useAdminApi ? 'Personal token must have read access to the project.' : 'Check UNLEASH_PROD_TOKEN (Backend token for production).';
             return res.status(prodResult.statusCode).json({
-                error: 'Failed to fetch production features',
+                error: is401 ? 'Unleash production returned 401 (unauthorized)' : 'Failed to fetch production features',
+                hint: is401 ? hint : undefined,
                 details: prodResult.data
             });
         }
 
-        // Client API returns { features: [...] } or { toggles: [...] }; each item has name, enabled, strategies
-        const stagingList = stagingResult.data.features ?? stagingResult.data.toggles ?? [];
-        const prodList = prodResult.data.features ?? prodResult.data.toggles ?? [];
+        let stagingMap, prodMap, getModifiedInfo;
+        const stagingEnvNames = UNLEASH_STAGING_ENV ? [UNLEASH_STAGING_ENV] : ['development', 'staging'];
+        const prodEnvNames = UNLEASH_PROD_ENV ? [UNLEASH_PROD_ENV] : ['production', 'prod'];
+        const envNames = (names) => (Array.isArray(names) ? names : [names]);
+        const findEnv = (f, preferredNames) => {
+            const raw = f?.environments;
+            if (Array.isArray(raw)) {
+                for (const name of envNames(preferredNames)) {
+                    const env = raw.find(e => (e.name || '').toLowerCase() === String(name).toLowerCase());
+                    if (env) return env;
+                }
+                return raw[0] || null;
+            }
+            if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                for (const name of envNames(preferredNames)) {
+                    const env = raw[String(name).toLowerCase()] ?? raw[name];
+                    if (env && typeof env === 'object') return env;
+                }
+                const firstKey = Object.keys(raw)[0];
+                return firstKey ? raw[firstKey] : null;
+            }
+            return null;
+        };
 
-        const stagingMap = new Map(stagingList.map(f => [f.name, f]));
-        const prodMap = new Map(prodList.map(f => [f.name, f]));
+        if (useAdminApi) {
+            // Admin API list: used for flag names and enabled state; full strategy details come from per-feature GET
+            const stagingFeatures = (stagingResult.data.features ?? []).filter(f => !f.archived);
+            const prodFeatures = (prodResult.data.features ?? []).filter(f => !f.archived);
+            stagingMap = new Map(stagingFeatures.map(f => [f.name, f]));
+            prodMap = new Map(prodFeatures.map(f => [f.name, f]));
+            getModifiedInfo = (name, stagingF, prodF, eventMaps) => {
+                if (eventMaps) {
+                    const fromProd = eventMaps.prod.get(name);
+                    const fromStaging = eventMaps.staging.get(name);
+                    const e = fromProd || fromStaging;
+                    const fromStagingFallback = !fromProd && !!fromStaging;
+                    if (e && (e.createdBy || e.createdAt)) return { user: e.createdBy || null, date: e.createdAt || null, action: null, fromStaging: fromStagingFallback };
+                }
+                const f = prodF || stagingF;
+                if (!f) return null;
+                const norm = (x) => x == null ? null : (typeof x === 'object' && x !== null ? (x.username ?? x.name ?? x.email) : String(x));
+                const by = norm(f.createdBy) ?? norm(f.lastModifiedBy) ?? null;
+                // Never use lastSeenAt - it's "last time flag was evaluated", not last user modification
+                const at = f.lastModifiedAt ?? f.createdAt ?? null;
+                return by || at ? { user: by || null, date: at, action: null, fromStaging: false } : null;
+            };
+        } else {
+            // Client API returns { features: [...] } or { toggles: [...] }; each item has name, enabled, strategies
+            const stagingList = stagingResult.data.features ?? stagingResult.data.toggles ?? [];
+            const prodList = prodResult.data.features ?? prodResult.data.toggles ?? [];
+            stagingMap = new Map(stagingList.map(f => [f.name, f]));
+            prodMap = new Map(prodList.map(f => [f.name, f]));
+            getModifiedInfo = () => null;
+        }
+        const eventMaps = useAdminApi ? eventsByInstance : null;
         
-        // Combine all flag names from Unleash
+        // Combine all flag names from Unleash (from both maps; Admin API has one list per instance so merge keys)
         const allUnleashNames = new Set([...stagingMap.keys(), ...prodMap.keys()]);
         
-        // Filter by ocmui- prefix (matching compare-envs.js behavior)
-        // Also include any non-prefixed flags that ARE in the codebase
         const FLAG_PREFIX = 'ocmui-';
         const codebaseFlagsSet = new Set(codebaseFlags);
         
@@ -2325,34 +2448,94 @@ app.get('/api/unleash/flags', async (req, res) => {
             filteredNames = [...allUnleashNames];
             console.log(`📊 Showing ALL ${filteredNames.length} flags (showAll=true)`);
         } else {
-            // Include flags that start with ocmui- OR are in the codebase (like compare-envs.js does)
             filteredNames = [...allUnleashNames].filter(name => 
                 name.startsWith(FLAG_PREFIX) || codebaseFlagsSet.has(name)
             );
             console.log(`📊 Filtered to ${filteredNames.length} flags with '${FLAG_PREFIX}' prefix or in codebase`);
         }
         
-        // Build comparison from Client API data (each feature already has enabled + strategies; no per-flag or events calls)
         const flagsData = [];
 
         for (const name of filteredNames) {
             const stagingFeature = stagingMap.get(name);
             const prodFeature = prodMap.get(name);
 
-            const stagingStatus = stagingFeature
-                ? { enabled: stagingFeature.enabled ?? false, strategies: stagingFeature.strategies || [] }
-                : null;
-            const prodStatus = prodFeature
-                ? { enabled: prodFeature.enabled ?? false, strategies: prodFeature.strategies || [] }
-                : null;
-            // Modification history requires Admin API; with Client API only we leave null
-            const prodModifiedInfo = null;
+            let stagingStatus = null;
+            let prodStatus = null;
+
+            if (useAdminApi) {
+                // Fetch full feature per flag so we get strategies (list endpoint often omits full strategy/constraint data)
+                if (stagingFeature) {
+                    try {
+                        const full = await makeUnleashRequest(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, `/admin/projects/${UNLEASH_PROJECT}/features/${encodeURIComponent(name)}`);
+                        if (full.statusCode === 200) {
+                            const env = findEnv(full.data, stagingEnvNames) || full.data.environments?.[0];
+                            stagingStatus = { enabled: env?.enabled ?? false, strategies: env?.strategies || [] };
+                        }
+                    } catch (e) {
+                        console.warn(`Unleash staging full feature ${name}:`, e.message);
+                    }
+                }
+                if (prodFeature) {
+                    try {
+                        const full = await makeUnleashRequest(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, `/admin/projects/${UNLEASH_PROJECT}/features/${encodeURIComponent(name)}`);
+                        if (full.statusCode === 200) {
+                            const env = findEnv(full.data, prodEnvNames) || full.data.environments?.[0];
+                            prodStatus = { enabled: env?.enabled ?? false, strategies: env?.strategies || [] };
+                        }
+                    } catch (e) {
+                        console.warn(`Unleash prod full feature ${name}:`, e.message);
+                    }
+                }
+            } else {
+                stagingStatus = stagingFeature
+                    ? { enabled: stagingFeature.enabled ?? false, strategies: stagingFeature.strategies || [] }
+                    : null;
+                prodStatus = prodFeature
+                    ? { enabled: prodFeature.enabled ?? false, strategies: prodFeature.strategies || [] }
+                    : null;
+            }
+
+            let prodModifiedInfo = null;
+            if (useAdminApi) {
+                const MEANINGFUL_EVENT_TYPES = [
+                    'feature-environment-enabled', 'feature-environment-disabled',
+                    'feature-strategy-add', 'feature-strategy-update', 'feature-strategy-remove',
+                    'feature-created', 'feature-metadata-updated'
+                ];
+                const fetchModifiedFromEvents = async (baseUrl, token, fromStaging) => {
+                    try {
+                        const res = await makeUnleashRequest(baseUrl, token, `/admin/events/${encodeURIComponent(name)}`);
+                        if (res.statusCode !== 200 || !res.data) return null;
+                        const list = Array.isArray(res.data) ? res.data : (res.data.events || []);
+                        const events = list.filter(e => (e.featureName || e.feature) === name);
+                        if (events.length === 0) return null;
+                        events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                        const last = events.find(e => MEANINGFUL_EVENT_TYPES.includes(e.type)) || events[0];
+                        return last?.createdBy != null || last?.createdAt
+                            ? { user: formatUser(last.createdBy), date: last.createdAt, action: null, fromStaging }
+                            : null;
+                    } catch (e) {
+                        return null;
+                    }
+                };
+                if (prodFeature) {
+                    prodModifiedInfo = await fetchModifiedFromEvents(UNLEASH_PROD_URL, UNLEASH_PROD_TOKEN, false);
+                }
+                if (!prodModifiedInfo && stagingFeature) {
+                    prodModifiedInfo = await fetchModifiedFromEvents(UNLEASH_STAGING_URL, UNLEASH_STAGING_TOKEN, true);
+                }
+                if (!prodModifiedInfo) {
+                    prodModifiedInfo = getModifiedInfo(name, stagingFeature, prodFeature, eventMaps);
+                }
+            }
 
             const staging = stagingStatus ? (stagingStatus.enabled ? 'ON' : 'OFF') : '-';
             const production = prodStatus ? (prodStatus.enabled ? 'ON' : 'OFF') : '-';
             const mismatch = staging !== '-' && production !== '-' && staging !== production;
 
-            const strategy = formatStrategySimple(prodStatus?.strategies || stagingStatus?.strategies);
+            const combinedStrategies = [...(prodStatus?.strategies || []), ...(stagingStatus?.strategies || [])];
+            const strategy = formatStrategySimple(combinedStrategies.length ? combinedStrategies : undefined);
 
             const inCode = codebaseFlagsSet.has(name);
 
@@ -2365,9 +2548,10 @@ app.get('/api/unleash/flags', async (req, res) => {
                 strategy,
                 stagingOnly: staging !== '-' && production === '-',
                 prodOnly: staging === '-' && production !== '-',
-                modifiedBy: prodModifiedInfo?.user || null,
-                modifiedAt: prodModifiedInfo?.date || null,
-                modifiedAction: prodModifiedInfo?.action || null
+                modifiedBy: prodModifiedInfo?.user ?? null,
+                modifiedAt: prodModifiedInfo?.date ?? null,
+                modifiedAction: prodModifiedInfo?.action ?? null,
+                modifiedFromStaging: prodModifiedInfo?.fromStaging ?? false
             });
         }
         

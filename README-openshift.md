@@ -1,10 +1,10 @@
 # Deploying OCMUI Team Dashboard to OpenShift
 
-This guide covers deploying the dashboard to an OpenShift cluster (ROSA, OSD, or self-managed).
+This guide covers deploying the dashboard to an OpenShift cluster (ROSA, OSD, or self-managed). **If you run the app locally only** (e.g. `yarn start:dev` with `.env`), you do **not** need an OpenShift/ROSA cluster; the cluster is optional.
 
 ## Prerequisites
 
-- OpenShift cluster (ROSA HCP recommended for cost/speed)
+- OpenShift cluster (ROSA HCP recommended for cost/speed) — only if deploying to OpenShift
 - `oc` CLI installed and logged in
 - Container registry access (Quay.io, Docker Hub, or OpenShift internal registry)
 - `podman` or `docker` for building images
@@ -76,6 +76,50 @@ oc get route ocmui-team-dashboard -o jsonpath='{.spec.host}'
 ```
 
 Visit `https://<route-url>` to access the dashboard.
+
+---
+
+## Disabling public access (run locally only)
+
+**Current decision:** The app is intended to run **locally** (e.g. `yarn start:dev` with `.env`). The public OpenShift route is disabled by default (see kustomization); an OpenShift/ROSA cluster is **optional** and not required when running locally. This avoids exposing GitHub/JIRA tokens and sensitive data.
+
+For security, the team may also choose not to expose the dashboard publicly (e.g. tokens are personal tokens with write access). The public route can be turned off as follows.
+
+### Turn off the public route
+
+**Option 1: Delete the Route (recommended)**  
+The app stays deployed but is no longer reachable from the internet.
+
+```bash
+oc project ocmui-dashboard
+oc delete route ocmui-team-dashboard
+```
+
+To **re-enable** later: `oc apply -f openshift/route.yaml` (and ensure `route.yaml` is listed in `openshift/kustomization.yaml` under `resources:` if you use `oc apply -k openshift/`).
+
+**Option 2: Scale deployment to zero**  
+No pods run; no cost; route would return 503.
+
+```bash
+oc scale deployment ocmui-team-dashboard --replicas=0 -n ocmui-dashboard
+```
+
+To **re-enable**: `oc scale deployment ocmui-team-dashboard --replicas=1 -n ocmui-dashboard`
+
+### Run the app locally
+
+Use a `.env` file with your tokens (see main README). From the project root:
+
+```bash
+yarn install
+yarn start:dev
+```
+
+Open `http://localhost:5173` (Vite) or `http://localhost:3017` (API only). No public route is involved. Basic Auth is **off** by default (no login prompt).
+
+**Feature Flags (local):** The Feature Flags tab uses the Unleash Admin API when you set **personal access tokens** (`user:xxxx`) for `UNLEASH_STAGING_TOKEN` and `UNLEASH_PROD_TOKEN` in `.env`. That enables correct strategy display (e.g. perOrg), "last modified by &lt;user&gt;" and real last-modified dates (from per-feature events). Backend tokens (`*:environment.xxxx`) use the Client API and do not provide modification history. Unleash API is on by default.
+
+If you later re-enable a public route, set `ENABLE_BASIC_AUTH=true` and `DASHBOARD_PASSWORD` in the deployment so the app is protected.
 
 ---
 

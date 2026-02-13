@@ -13,6 +13,7 @@ interface FeatureFlag {
   modifiedBy: string | null;
   modifiedAt: string | null;
   modifiedAction: string | null;
+  modifiedFromStaging?: boolean;
 }
 
 interface FlagsSummary {
@@ -64,7 +65,8 @@ const FeatureFlagsPanel: React.FC = () => {
       const res = await auditFetch('/api/unleash/flags');
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${res.status}`);
+        const msg = errData.hint ? `${errData.error} ${errData.hint}` : (errData.error || `HTTP ${res.status}`);
+        throw new Error(msg);
       }
       
       const data: FlagsResponse = await res.json();
@@ -331,10 +333,11 @@ const FeatureFlagsPanel: React.FC = () => {
                   </td>
                   <td className="ff-cell-status">
                     {getStatusBadge(flag)}
-                    {flag.modifiedBy && (
+                    {(flag.modifiedBy || flag.modifiedAt) && (
                       <span className="ff-modified">
-                        by {flag.modifiedBy}
-                        {flag.modifiedAt && ` (${formatDate(flag.modifiedAt)})`}
+                        {flag.modifiedBy && <>by {flag.modifiedBy}</>}
+                        {flag.modifiedAt && (flag.modifiedBy ? ` (${formatDate(flag.modifiedAt)})` : formatDate(flag.modifiedAt))}
+                        {flag.modifiedFromStaging && ' (stage)'}
                       </span>
                     )}
                   </td>

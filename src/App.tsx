@@ -7,6 +7,7 @@ import SettingsModal from './components/SettingsModal';
 import FirstRunIdentityModal from './components/FirstRunIdentityModal';
 import jiraLogo from './assets/jiraLogo.png';
 import githubIcon from './assets/githubIcon.png';
+import unleashIcon from './assets/unleash.png';
 import './styles/App.css';
 
 // Tab types for the application
@@ -51,7 +52,7 @@ const secondaryTabConfig: Record<PrimaryTabType, Array<{ id: TabType; label: str
     { id: 'reviewers', label: 'Reviewers' }
   ],
   other: [
-    // feature-flags tab hidden (code kept in FeatureFlagsPanel.tsx + server /api/unleash/*) until service-account or token auth is resolved
+    { id: 'feature-flags', label: 'Feature Flags', icon: unleashIcon },
     { id: 'doc-links', label: 'Doc Links', icon: linkIcon }
   ]
 };

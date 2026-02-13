@@ -7,7 +7,7 @@ metadata:
 resources:
   - deployment.yaml
   - service.yaml
-  - route.yaml
+  # - route.yaml   # Disabled: public route off for security; run app locally. To re-enable, uncomment and oc apply -k openshift/
   - pvc.yaml  # Phase 4: Persistent storage for team roster
 
 commonLabels:

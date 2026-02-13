@@ -36,7 +36,7 @@ The header uses an **inline grouped navigation** with primary categories and the
 |-------------|----------------|-------------|
 | **🎫 JIRA** | My Sprint JIRAs, Epics | JIRA ticket management, team epics view |
 | **🐙 GitHub** | My Code Reviews, My PRs, Reviewers | GitHub PR tracking, team workload |
-| **••• Other** | 🔗 Doc Links | URL health checker (Feature Flags tab hidden; code preserved for future) |
+| **••• Other** | 🚩 Feature Flags, 🔗 Doc Links | Unleash feature flags, URL health checker |
 
 - **Quick Find bar** in header allows instant lookup of JIRA tickets or PRs by ID
 - Click a **primary tab** to switch categories and reveal its subtabs
@@ -52,7 +52,7 @@ The header uses an **inline grouped navigation** with primary categories and the
   - Reference Time input with 30‑minute steps (09:00–17:00) and TZ dropdown sortable alphabetically or by GMT offset
 - **Comment Awareness**: JIRA comments sorted by latest activity (updated if present); edited comments labeled "(edited)"
 - **Accurate PR Checks**: Checks badge reflects GitHub combined status and shows failing/pending context names in a tooltip
-- **Feature Flags**: Code preserved but tab hidden (Unleash token auth issues with devshift). Server `/api/unleash/*` and `FeatureFlagsPanel.tsx` remain for when service-account or token auth is resolved.
+- **Feature Flags**: Compare Unleash feature flags (staging vs production). Shows Stage/Prod ON-OFF, strategy (e.g. All, perOrg), "In Code?" column, and **last modified by &lt;user&gt; (date)**. Uses Admin API with personal access tokens when running locally; per-feature API calls ensure correct strategy (e.g. perOrg) and real last-modified dates. Unleash API on by default.
 - **Doc Links Health Checker**: Validates 425 external documentation URLs from uhc-portal with real-time checks
 - **App Security Info**: Click "ⓘ App Security" in Settings to see how your data is protected
 
@@ -119,8 +119,8 @@ The dashboard is deployed and ready to use:
 # With hot reloading (all features)
 GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx UNLEASH_STAGING_TOKEN=user:xxxx UNLEASH_PROD_TOKEN=user:xxxx yarn start:dev
 ```
-- **API Server**: `http://localhost:3017` (Express.js)
-- **React App**: `http://localhost:5174` (Vite HMR)
+- **API Server**: `http://localhost:3017` (Express.js; nodemon restarts on `server/` changes)
+- **React App**: `http://localhost:5173` (Vite HMR)
 
 ### Environment Variables
 
@@ -128,13 +128,17 @@ GITHUB_TOKEN=ghp_xxxx JIRA_TOKEN=xxxx UNLEASH_STAGING_TOKEN=user:xxxx UNLEASH_PR
 |----------|-------------|
 | `GITHUB_TOKEN` | GitHub personal access token (service account) |
 | `JIRA_TOKEN` | Red Hat JIRA personal access token |
-| `UNLEASH_STAGING_TOKEN` | Unleash staging API token (for Feature Flags tab) |
-| `UNLEASH_PROD_TOKEN` | Unleash production API token (for Feature Flags tab) |
+| `UNLEASH_STAGING_TOKEN` | Unleash staging token: personal `user:xxxx` (Admin API, shows last modified by) or backend `*:env.xxxx` (Client API) |
+| `UNLEASH_PROD_TOKEN` | Unleash production token (same format as staging) |
 | `PORT` | Server port (default: 3017) |
+| `ENABLE_UNLEASH_API` | Set to `false` to disable Feature Flags API (e.g. when public) |
+| `ENABLE_BASIC_AUTH` | Set to `true` with `DASHBOARD_PASSWORD` to require login on public deployments |
 
 **Using a `.env` file:** Put these in a `.env` file in the project root and the server will load them automatically (no need to pass them in the terminal). Copy `.env.example` to `.env` and fill in your values. The `.env` file is gitignored so your tokens are not committed.
 
-**Feature Flags (tab hidden):** The Unleash API is **disabled by default** (`ENABLE_UNLEASH_API` is not set). The routes `/api/unleash/status` and `/api/unleash/flags` return 404 until you set `ENABLE_UNLEASH_API=true` (e.g. when token auth is fixed and the tab is re-enabled).
+**Feature Flags:** Use **personal access tokens** (format `user:xxxx`) in Unleash so the dashboard can call the Admin API and show "last modified by &lt;user&gt;" and correct dates (per-feature events). Backend tokens (`*:environment.xxxx`) use the Client API and do not get modification history. The Unleash API is **on by default** (for local use). Set `ENABLE_UNLEASH_API=false` to disable it when the app is exposed publicly. Optional: `UNLEASH_PROJECT` (default `default`), `UNLEASH_STAGING_ENV` / `UNLEASH_PROD_ENV` if your instance uses different environment names.
+
+**Basic Auth:** **Off by default** (no login when running locally). Set `ENABLE_BASIC_AUTH=true` and `DASHBOARD_PASSWORD` to protect a public deployment.
 
 ## 🚢 Deploying to OpenShift
 
