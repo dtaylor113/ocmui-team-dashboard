@@ -265,12 +265,24 @@ const EpicChildIssues: React.FC<{ parentKey: string }> = ({ parentKey }) => {
   if (error) return <div className="epics-children-error">Failed to load child issues</div>;
   if (!data?.success || !data.issues?.length) return <div className="epics-children-empty">No child issues</div>;
 
+  // Sort by status: active statuses first, Closed last
+  const statusOrder: Record<string, number> = {
+    'IN PROGRESS': 0, 'CODE REVIEW': 1, 'REVIEW': 1, 'TO DO': 2, 'OPEN': 2,
+    'REFINEMENT': 3, 'DONE': 4, 'RESOLVED': 5, 'CLOSED': 6
+  };
+  const sortedIssues = [...data.issues].sort((a: any, b: any) => {
+    const aOrder = statusOrder[a.status?.toUpperCase()] ?? 3;
+    const bOrder = statusOrder[b.status?.toUpperCase()] ?? 3;
+    return aOrder - bOrder;
+  });
+
   return (
     <div className="epics-children-table-wrapper">
       <table className="epics-children-table">
         <thead>
           <tr>
             <th>Key</th>
+            <th>P</th>
             <th>Summary</th>
             <th>Type</th>
             <th>Status</th>
@@ -279,37 +291,43 @@ const EpicChildIssues: React.FC<{ parentKey: string }> = ({ parentKey }) => {
           </tr>
         </thead>
         <tbody>
-          {data.issues.map((issue: any) => (
-            <tr key={issue.key}>
-              <td className="epics-child-key">
-                <a
-                  href={`https://issues.redhat.com/browse/${issue.key}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="epics-link"
-                >
-                  {issue.key}
-                </a>
-              </td>
-              <td className="epics-child-summary" title={issue.summary}>
-                {issue.summary}
-              </td>
-              <td className="epics-child-type">
-                <span className={`epics-type-badge epics-type-${issue.type?.toLowerCase().replace(/\s+/g, '-')}`}>
-                  {issue.type}
-                </span>
-              </td>
-              <td className="epics-child-status">
-                <span className={`epics-status-badge epics-status-${issue.status?.toLowerCase().replace(/\s+/g, '-')}`}>
-                  {issue.status}
-                </span>
-              </td>
-              <td className="epics-child-assignee">{issue.assignee || 'Unassigned'}</td>
-              <td className="epics-child-updated" title={issue.updated ? new Date(issue.updated).toLocaleString() : ''}>
-                {formatLastUpdatedShort(issue.updated, issue.lastUpdatedBy)}
-              </td>
-            </tr>
-          ))}
+          {sortedIssues.map((issue: any) => {
+            const isClosed = issue.status?.toLowerCase() === 'closed';
+            return (
+              <tr key={issue.key} className={isClosed ? 'epics-child-closed' : ''}>
+                <td className="epics-child-key">
+                  <a
+                    href={`https://issues.redhat.com/browse/${issue.key}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="epics-link"
+                  >
+                    {issue.key}
+                  </a>
+                </td>
+                <td className="epics-cell-priority">
+                  <PriorityIcon priority={issue.priority} />
+                </td>
+                <td className="epics-child-summary" title={issue.summary}>
+                  {issue.summary}
+                </td>
+                <td className="epics-child-type">
+                  <span className={`epics-type-badge epics-type-${issue.type?.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {issue.type}
+                  </span>
+                </td>
+                <td className="epics-child-status">
+                  <span className={`epics-status-badge epics-status-${issue.status?.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {issue.status}
+                  </span>
+                </td>
+                <td className="epics-child-assignee">{issue.assignee || 'Unassigned'}</td>
+                <td className="epics-child-updated" title={issue.updated ? new Date(issue.updated).toLocaleString() : ''}>
+                  {formatLastUpdatedShort(issue.updated, issue.lastUpdatedBy)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -391,7 +409,12 @@ const ParentTargetEnd: React.FC<{ parentKey: string | null; featureKey: string |
 // Utility functions
 const formatDate = (dateStr: string | null): string => {
   if (!dateStr) return '—';
-  const date = new Date(dateStr);
+  // Extract YYYY-MM-DD and construct as local time to avoid UTC timezone shift
+  // (new Date("YYYY-MM-DD") and new Date("YYYY-MM-DDT00:00:00.000+0000") both parse as UTC,
+  //  which shifts the displayed day back by one in US timezones)
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return '—';
+  const date = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
   const now = new Date();
   // Include year only if different from current year
   const sameYear = date.getFullYear() === now.getFullYear();
@@ -404,10 +427,12 @@ const formatDate = (dateStr: string | null): string => {
 
 const getTargetEndColor = (dateStr: string | null): string | null => {
   if (!dateStr) return null;
-  const due = new Date(dateStr);
+  // Extract YYYY-MM-DD and construct as local time to avoid UTC timezone shift
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDateOnly = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const dueDateOnly = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
   const diffTime = dueDateOnly.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   

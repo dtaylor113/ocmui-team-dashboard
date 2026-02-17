@@ -1729,7 +1729,7 @@ app.post('/api/jira-child-issues', async (req, res) => {
         const jql = `(parent = ${parentKey} OR "Epic Link" = ${parentKey} OR "Parent Link" = ${parentKey}) ORDER BY updated DESC`;
         const encodedJql = encodeURIComponent(jql);
 
-        const apiPath = `/rest/api/2/search?jql=${encodedJql}&maxResults=100&fields=key,summary,assignee,status,issuetype,updated&expand=changelog`;
+        const apiPath = `/rest/api/2/search?jql=${encodedJql}&maxResults=100&fields=key,summary,assignee,status,issuetype,priority,updated&expand=changelog`;
 
         const options = {
             hostname: 'issues.redhat.com',
@@ -1764,6 +1764,7 @@ app.post('/api/jira-child-issues', async (req, res) => {
                                 summary: issue.fields?.summary || 'No summary',
                                 assignee: issue.fields?.assignee?.displayName || 'Unassigned',
                                 status: issue.fields?.status?.name || 'Unknown',
+                                priority: issue.fields?.priority?.name || 'Normal',
                                 type: issue.fields?.issuetype?.name || 'Task',
                                 updated: issue.fields?.updated || null,
                                 lastUpdatedBy: lastUpdatedBy

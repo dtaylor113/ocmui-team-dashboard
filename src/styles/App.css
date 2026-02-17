@@ -5972,7 +5972,6 @@ body.dark-theme .github-image-fallback:hover {
 /* Child issues table */
 .epics-children-table-wrapper {
   overflow-x: auto;
-  max-height: 200px;
 }
 
 .epics-children-table {
@@ -6032,6 +6031,14 @@ body.dark-theme .github-image-fallback:hover {
 
 .epics-children-table tr:hover {
   background: rgba(139, 92, 246, 0.05);
+}
+
+.epics-child-closed {
+  opacity: 0.4;
+}
+
+.epics-child-closed:hover {
+  opacity: 0.6;
 }
 
 /* Child issue status badges */

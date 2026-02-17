@@ -24,66 +24,70 @@
     "name": "Trevor Hendricks",
     "role": "dev",
     "tz": "America/New_York",
+    "github": "t-hendricks",
     "jira": "thendric@redhat.com"
   },
   {
     "name": "Lakshmi Shivanthi",
     "role": "qe dev",
     "tz": "America/Los_Angeles",
+    "github": "shivanthi-amara",
     "jira": "lamarach@redhat.com"
   },
   {
     "name": "Jason Loss",
     "role": "qe dev",
     "tz": "America/New_York",
+    "github": "jloss-redhat",
     "jira": "jloss@redhat.com"
   },
   {
     "name": "Joseph Caiani",
     "role": "manager",
     "tz": "America/New_York",
+    "github": "jcaianirh",
     "jira": "jcaiani@redhat.com"
   },
   {
     "name": "Roberto Emanuel",
     "role": "architect",
     "tz": "Europe/Rome",
+    "github": "kelvah",
     "jira": "remanuel@redhat.com"
-  },
-  {
-    "name": "Denis Ragan",
-    "role": "qe dev",
-    "tz": "Europe/Berlin",
-    "jira": "dragan@redhat.com"
   },
   {
     "name": "Lyn Malka",
     "role": "dev",
     "tz": "Asia/Jerusalem",
+    "github": "eliranmal",
     "jira": "emalka@redhat.com"
   },
   {
     "name": "Lior Keren",
     "role": "dev",
     "tz": "Asia/Jerusalem",
+    "github": "LiorKGOW",
     "jira": "lkeren@redhat.com"
   },
   {
     "name": "Netta Meiri",
     "role": "intern",
     "tz": "Asia/Jerusalem",
+    "github": "meirinetta",
     "jira": "nmeiri@redhat.com"
   },
   {
     "name": "Liza Gilman",
     "role": "dev",
     "tz": "Asia/Jerusalem",
+    "github": "lizagilman",
     "jira": "egilman@redhat.com"
   },
   {
     "name": "Jaya Mekkattillan",
     "role": "qe lead",
     "tz": "Asia/Calcutta",
+    "github": "jmekkatt",
     "jira": "jmekkatt@redhat.com"
   }
 ]

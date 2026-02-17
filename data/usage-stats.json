@@ -1,17 +1,17 @@
 {
-  "totalRequests": 17,
+  "totalRequests": 11223,
   "uniqueUsers": {
     "anonymous": {
       "firstSeen": "2026-02-09T21:46:03.329Z",
-      "lastSeen": "2026-02-09T21:46:15.889Z",
-      "requestCount": 3,
+      "lastSeen": "2026-02-17T20:30:33.841Z",
+      "requestCount": 5775,
       "teamMember": null,
       "authUser": "anonymous"
     },
     "Dave Taylor": {
       "firstSeen": "2026-02-09T21:46:09.858Z",
-      "lastSeen": "2026-02-09T21:58:49.424Z",
-      "requestCount": 12,
+      "lastSeen": "2026-02-19T14:40:52.285Z",
+      "requestCount": 5446,
       "teamMember": "Dave Taylor",
       "authUser": "anonymous"
     },
@@ -32,23 +32,162 @@
   },
   "endpointHits": {
     "/api/audit/users": 2,
-    "/api/team/members": 4,
+    "/api/team/members": 110,
     "/api/jira/status": 1,
     "/api/github/status": 1,
     "/api/audit/stats": 1,
-    "/api/jira-epics": 1,
-    "/api/jira-ticket": 7
+    "/api/jira-epics": 376,
+    "/api/jira-ticket": 915,
+    "/api/jira-sprint-tickets": 13,
+    "/api/unleash/status": 38,
+    "/api/unleash/flags": 34,
+    "/api/github/search/issues": 282,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/354/comments": 104,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/354": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/354/requested_reviewers": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/367": 363,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/367/reviews": 363,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/354/reviews": 104,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/254/requested_reviewers": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/254/comments": 104,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/346": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/254": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/346/comments": 102,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/346/requested_reviewers": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/346/reviews": 102,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/254/reviews": 104,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/257/requested_reviewers": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/257/reviews": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/257": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/257/comments": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/b01bfbe6f7fa9c020c366c469429226b9768dfc6/status": 2,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/52e8237179ab7a6b67e49bab6f5356bbe0a663b2/status": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/71786fa36fcebbd3d573182293d32c3856678342/status": 3,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/17b76ffe197bb6a8f2ea35286e920b9a82126f96/status": 100,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/351/reviews": 369,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/351": 363,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/362": 361,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/362/reviews": 363,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/366/reviews": 369,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/366": 363,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/355/reviews": 367,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/355": 363,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/367/requested_reviewers": 181,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/367/comments": 181,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/366/comments": 187,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/366/requested_reviewers": 181,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/351/requested_reviewers": 181,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/351/comments": 187,
+    "/api/github/reviewer-workload": 10,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/362/comments": 182,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/362/requested_reviewers": 180,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/355/comments": 185,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/355/requested_reviewers": 181,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/fd1560a01c71a34654c4fcdc98be89e89f6b476b/status": 2,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/70be77cd0344bf9415fe8816ef6df8651b6df80d/status": 180,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/f36bf965def2bf744ae7dc187d50324e38dae88f/status": 181,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/8150af5dd10e83791418119c560b3832a34981b0/status": 160,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/e29663b30296ebb74effeebf2031758ef884b9a0/status": 181,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/3f8c23691a9fcec2993649998759240afdf07a5b/status": 97,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/3c2388bcd3f5ebbf126842f1cf3e8b8ec3e3d0bb/status": 179,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/354/comments": 4,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/254/comments": 4,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/e397e4ee9299570eaf896daa1aeb399cc33841e1/status": 96,
+    "/api/team/members/Lakshmi%20Shivanthi": 1,
+    "/api/team/members/Trevor%20Hendricks": 1,
+    "/api/team/members/Jason%20Loss": 1,
+    "/api/team/members/Joseph%20Caiani": 1,
+    "/api/team/members/Roberto%20Emanuel": 1,
+    "/api/team/members/Denis%20Ragan": 2,
+    "/api/team/members/Lyn%20Malka": 1,
+    "/api/team/members/Lior%20Keren": 1,
+    "/api/team/members/Liza%20Gilman": 1,
+    "/api/team/members/Netta%20Meiri": 1,
+    "/api/team/members/Jaya%20Mekkattillan": 1,
+    "/api/jira-child-issues": 38,
+    "/api/jira-update-field": 11,
+    "/": 11,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/364/reviews": 222,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/364": 222,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/364/comments": 111,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/364/requested_reviewers": 111,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/63aac1aeddabd8b2069f6e3ea3f460a7c654460c/status": 7,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/cc255754ac3fa55edcb63b0f58a0c4f34ec3f577/status": 31,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/51f60f765ad90035a71a3c94ca76fdab71dc3ddc/status": 52,
+    "/.well-known/appspecific/com.chrome.devtools.json": 3,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/369": 48,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/369/reviews": 48,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/369/requested_reviewers": 24,
+    "/api/github/repos/RedHatInsights/uhc-portal/issues/369/comments": 24,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/8c03da92b73fb49c4d91e8030b8e52ba4fcc9b8b/status": 24,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/366/comments": 6,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/351/comments": 6,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/355/comments": 4,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/346/comments": 2,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/1e9b9fe46a29140add2cd25a549cad3850d0d23d/status": 21,
+    "/api/github/repos/RedHatInsights/uhc-portal/commits/e318df612391f22fd101e811c2db3895500e3864/status": 21,
+    "/api/github/repos/RedHatInsights/uhc-portal/pulls/362/comments": 2
   },
   "dailyActivity": {
     "2026-02-09": {
-      "requests": 17,
+      "requests": 62,
       "users": [
         "anonymous",
         "Dave Taylor",
         "Zac Herman",
         "Dylan Cooper"
       ]
+    },
+    "2026-02-10": {
+      "requests": 159,
+      "users": [
+        "Dave Taylor"
+      ]
+    },
+    "2026-02-11": {
+      "requests": 282,
+      "users": [
+        "Dave Taylor"
+      ]
+    },
+    "2026-02-12": {
+      "requests": 29,
+      "users": [
+        "Dave Taylor"
+      ]
+    },
+    "2026-02-13": {
+      "requests": 45,
+      "users": [
+        "Dave Taylor"
+      ]
+    },
+    "2026-02-16": {
+      "requests": 6399,
+      "users": [
+        "Dave Taylor",
+        "anonymous"
+      ]
+    },
+    "2026-02-17": {
+      "requests": 4136,
+      "users": [
+        "Dave Taylor",
+        "anonymous"
+      ]
+    },
+    "2026-02-18": {
+      "requests": 105,
+      "users": [
+        "Dave Taylor"
+      ]
+    },
+    "2026-02-19": {
+      "requests": 6,
+      "users": [
+        "Dave Taylor"
+      ]
     }
   },
-  "serverStartTime": "2026-02-09T21:58:39.566Z"
+  "serverStartTime": "2026-02-17T20:34:25.624Z"
 }
